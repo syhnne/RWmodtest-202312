@@ -1,0 +1,10 @@
+﻿{
+	"id": "Emily1212.slugtemplate",
+	"name": "Slugcat Test-01",
+	"version": "0.1.0",
+	"authors": "Emily1212",
+	"description": "this is just for testing, dont upload it",
+	"requirements": [ "slime-cubed.slugbase" ],
+	"requirements_names": [ "SlugBase" ],
+	"tags": [ "Custom Slugcat" ]
+}
