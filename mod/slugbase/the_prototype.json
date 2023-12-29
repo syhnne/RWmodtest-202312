@@ -1,14 +1,34 @@
 {
-	"id": "Prototype",
-	"name": "The Prototype",
+	"id": "MySlugcat",
+	"name": "My Slugcat",
 	"description": "A recolored copy of The Survivor that demonstrates some custom SlugBase features.<LINE>This is a template mod for SlugBase.",
+
 	"features": {
 		"color": "9cf0a4",
-		"slugtemplate/super_jump": 0.5,
-		"slugtemplate/explode_on_death": true,
-		
-		"select_menu_scene": "Slugcat_Prototype",
-		"select_menu_scene_ascended": "Ghost_Prototype",
-		"slugtemplate/mean_lizards": 0.8
-	}
+		"test01/super_jump": 0.5,
+		"test01/explode_on_death": true,
+		"test01/mean_lizards": 0.8,
+		"select_menu_scene": "Slugcat_MySlugcat",
+		"select_menu_scene_ascended": "Ghost_MySlugcat",
+
+		"auto_grab_batflies": true,
+		"weight": [ 1.0, 0.8 ],
+		"walk_speed": 1.2,
+		"throw_skill": [ 1.1, 0.9 ],
+		"food_min": 5,
+		"food_max": 9,
+
+		"karma": 9, //发布的时候把这个业力改回0//
+		"karma_cap": 9,
+		"the_mark": true,
+		"guide_overseer": 4, //啊，没有蓝的嘛？//
+		"start_room": "SS_D07",
+		"world_state": [ "MySlugcat", "Artificer" ]
+	},
+
+	"alignments": {
+		"Scavengers": {
+			"like": -0.45,
+		},
+	},
 }
