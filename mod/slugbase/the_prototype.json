@@ -5,11 +5,13 @@
 
 	"features": {
 		"color": "9cf0a4",
+		"test01/is_my_cat?????": true,
 		"test01/super_jump": 0.5,
 		"test01/explode_on_death": true,
-		"test01/mean_lizards": 0.8,
+		"test01/explosion_capacity": 10,
 		"select_menu_scene": "Slugcat_MySlugcat",
 		"select_menu_scene_ascended": "Ghost_MySlugcat",
+
 
 		"auto_grab_batflies": true,
 		"weight": [ 1.0, 0.8 ],
@@ -18,17 +20,18 @@
 		"food_min": 5,
 		"food_max": 9,
 
-		"karma": 9, //发布的时候把这个业力改回0//
+		"karma": 9,
 		"karma_cap": 9,
 		"the_mark": true,
-		"guide_overseer": 4, //啊，没有蓝的嘛？//
-		"start_room": "SS_D07",
+
+		"guide_overseer": 4,
+
 		"world_state": [ "MySlugcat", "Artificer" ]
 	},
 
 	"alignments": {
 		"Scavengers": {
-			"like": -0.45,
-		},
-	},
+			"like": -0.45
+		}
+	}
 }

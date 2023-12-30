@@ -33,3 +33,15 @@ To do list:
 
 hook参考：https://github.com/pkuyo/Nutils/tree/master
 https://github.com/Zeldack974/Silkslug/tree/master/src
+
+
+20231230
+方便起见，我还是准备把所有笔记都写这里。我找到一个非常好的教程：https://rwmoddingch.github.io/ChModdingWiki/
+他解决了我看不懂代码的疑惑，我觉得我又行了。
+按照它的说法，我要先用自然语言把执行技能的流程描述一遍。我可以不这么做，前提是我找得到炸猫的代码。
+啊，我好像理解为什么炸猫易溶于水了——因为这样不用给水下爆炸技能写额外代码。
+但我这边还算方便，水下电击有一个单独的方法，我应该大概或许可以直接拿来用。
+
+woc，json不让注释？？
+以后做完了再把这个加回去，我受不了fp门口那个零重力空间了
+"start_room": "SS_D07",
