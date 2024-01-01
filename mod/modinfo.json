@@ -1,10 +1,10 @@
 ﻿{
-	"id": "Emily1212.slugtemplate",
-	"name": "Slugcat Test-01",
+	"id": "PebblesSlug_by_syhnne",
+	"name": "PebblesSlug",
 	"version": "0.1.0",
 	"authors": "Emily1212",
-	"description": "this is just for testing, dont upload it",
-	"requirements": [ "slime-cubed.slugbase" ],
-	"requirements_names": [ "SlugBase" ],
+	"description": "噢，我的上帝，这个项目简直愚蠢透顶，还好它只花了我三天时间",
+	"requirements": [ "slime-cubed.slugbase", "moreslugcats" ],
+	"requirements_names": [ "SlugBase", "More Slugcats Expansion" ],
 	"tags": [ "Custom Slugcat" ]
 }
