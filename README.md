@@ -1,3 +1,7 @@
+安装方法：下载mod文件夹，把它放在 C:\Program Files (x86)\Steam\steamapps\common\Rain World\RainWorld_Data\StreamingAssets\mods
+需要dlc和slugbase
+
+
 Use this template on GitHub or [download the code](https://github.com/SlimeCubed/ExampleSlugBaseMod/archive/refs/heads/master.zip), whichever is easiest.
 
 Links:
