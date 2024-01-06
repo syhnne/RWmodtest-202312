@@ -1,4 +1,5 @@
 安装方法：下载mod文件夹，把它放在 C:\Program Files (x86)\Steam\steamapps\common\Rain World\RainWorld_Data\StreamingAssets\mods
+
 需要dlc和slugbase
 
 
@@ -17,6 +18,7 @@ To do list:
 - （已完成）对于玩家有没有dlc的验证。比我想的简单多了，在slugbase的modinfo里面写上就行
 - 画皮肤，我想画个围巾，能随风飘动的那种。这恐怕比下面说的改一些剧情行为还要费劲。。
 - 画封面图。我不想画画哼哼啊啊啊啊啊啊啊啊啊啊啊啊啊（突发恶疾）
+- 如果可以的话，修一下水下痛击队友的bug。其实队友无所谓，我主要是担心这个bug会电死猫崽
 - （已完成）修改技能，下面是我目前对技能的想法，基本上是魔改一下炸猫。其他的基本属性我没怎么想，反正那玩意儿改着方便，回头再说。
 	- 消耗2格饱食度，把普通矛和没电的电矛变成充满电的电矛，对于有电的电矛不起作用（https://rainworld.miraheze.org/wiki/Electric_Spear/zh-hans）
 	- 尝试用炸矛进行制作会发生爆炸并造成晕眩。新年夜写这个代码，也算是一种放烟花吧……
