@@ -1,6 +1,6 @@
 {"frames": {
 
-"FaceA0.png":
+"fp_face.png":
 {
 	"frame": {"x":2,"y":2,"w":46,"h":48},
 	"rotated": false,

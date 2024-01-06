@@ -18,6 +18,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SlugBase.DataTypes;
 
 
 
@@ -42,10 +43,12 @@ class Plugin : BaseUnityPlugin
     // 发布之前记得把这个IsMyCat改成一个什么别的东西。这玩意儿肯定有其他的猫要用，我怕有冲突
     // 没事了，我以后再也不要用这个了。。
 
-
+    private static readonly Color32 bodyColor_hard = new Color32(254, 104, 202, 255);
+    private static readonly Color eyesColor_hard = new Color(1f, 1f, 1f);
 
     public static readonly PlayerFeature<bool> IsMyCat = PlayerBool("slugtemplate/is_my_cat");
-
+    public static readonly PlayerFeature<Color> BodyColor = PlayerColor("Body");
+    public static readonly PlayerFeature<Color> EyesColor = PlayerColor("Eyes");
 
     public static new ManualLogSource Logger { get; private set; }
 
@@ -72,21 +75,119 @@ class Plugin : BaseUnityPlugin
             On.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject;
             On.Player.GrabUpdate += Player_GrabUpdate;
             On.Creature.Violence += Creature_Violence;
+
             // On.Room.PlaySound_SoundID_Vector2 += Room_PlaySound_SoundID_Vector2;
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
 
             On.Player.CanBeSwallowed += Player_CanBeSwallowed;
             // On.PlayerGraphics.ColoredBodyPartList += PlayerGraphics_ColoredBodyPartList;
 
-            
+            On.PlayerGraphics.InitiateSprites += PlayerGraphics_InitiateSprites;
+            // On.PlayerGraphics.AddToContainer += PlayerGraphics_AddToContainer;
+            On.PlayerGraphics.DrawSprites += PlayerGraphics_DrawSprites;
+            On.PlayerGraphics.ApplyPalette += PlayerGraphics_ApplyPalette;
+
+
         }
         catch (Exception ex)
         {
+            Debug.Log(DateTime.Now);
             Debug.LogException(ex);
+            base.Logger.LogMessage(DateTime.Now);
             base.Logger.LogError(ex);
         }
 
     }
+
+
+
+
+    // 因为根本不会C#所以把图形和技能全写一起了
+    private void PlayerGraphics_InitiateSprites(On.PlayerGraphics.orig_InitiateSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+    {
+        orig(self, sLeaser, rCam);
+        if (IsMyCat.TryGet(self.player, out bool is_my_cat) && is_my_cat)
+        {
+            FAtlas fatlas = Futile.atlasManager.LoadAtlas("atlases/fp_tail");
+            TriangleMesh.Triangle[] tris = new TriangleMesh.Triangle[]
+            {
+                new TriangleMesh.Triangle(0, 1, 2),
+                new TriangleMesh.Triangle(1, 2, 3),
+                new TriangleMesh.Triangle(2, 3, 4),
+                new TriangleMesh.Triangle(3, 4, 5),
+                new TriangleMesh.Triangle(4, 5, 6),
+                new TriangleMesh.Triangle(5, 6, 7),
+                new TriangleMesh.Triangle(6, 7, 8),
+                new TriangleMesh.Triangle(7, 8, 9),
+                new TriangleMesh.Triangle(8, 9, 10),
+                new TriangleMesh.Triangle(9, 10, 11),
+                new TriangleMesh.Triangle(10, 11, 12),
+                new TriangleMesh.Triangle(11, 12, 13),
+                new TriangleMesh.Triangle(12, 13, 14),
+            };
+            TriangleMesh triangleMesh = new TriangleMesh("fp_tail", tris, false, false);
+            triangleMesh.UVvertices[0] = fatlas._elementsByName["fp_tail"].uvBottomLeft;
+            triangleMesh.UVvertices[1] = fatlas._elementsByName["fp_tail"].uvTopLeft;
+            triangleMesh.UVvertices[13] = fatlas._elementsByName["fp_tail"].uvTopRight;
+            triangleMesh.UVvertices[14] = fatlas._elementsByName["fp_tail"].uvBottomRight;
+            float num = (triangleMesh.UVvertices[13].x - triangleMesh.UVvertices[1].x) / 6f;
+            for (int i = 2; i < 14; i += 2)
+            {
+                triangleMesh.UVvertices[i].x = (float)((double)fatlas._elementsByName["fp_tail"].uvBottomLeft.x + (double)num * 0.5 * (double)i);
+                triangleMesh.UVvertices[i].y = fatlas._elementsByName["fp_tail"].uvBottomLeft.y;
+            }
+            for (int j = 3; j < 13; j += 2)
+            {
+                triangleMesh.UVvertices[j].x = (float)((double)fatlas._elementsByName["fp_tail"].uvTopLeft.x + (double)num * 0.5 * (double)(j - 1));
+                triangleMesh.UVvertices[j].y = fatlas._elementsByName["fp_tail"].uvTopLeft.y;
+            }
+            sLeaser.sprites[2] = triangleMesh;
+
+            self.AddToContainer(sLeaser, rCam, null);
+        }
+    }
+
+    private void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+    {
+        orig(self, sLeaser, rCam, timeStacker, camPos);
+        if (IsMyCat.TryGet(self.player, out bool is_my_cat) && is_my_cat)
+        {
+            sLeaser.sprites[2].element = Futile.atlasManager.GetElementWithName("fp_tail");
+            sLeaser.sprites[3].element = Futile.atlasManager.GetElementWithName("fp_head");
+        }
+    }
+
+    private void PlayerGraphics_ApplyPalette(On.PlayerGraphics.orig_ApplyPalette orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
+    {
+        orig(self, sLeaser, rCam, palette);
+        if (IsMyCat.TryGet(self.player, out bool is_my_cat) && is_my_cat) 
+        { 
+            for (int i = 0; i < sLeaser.sprites.Length; i++)
+            {
+                // 2是尾巴，9是眼睛，除此以外都涂成粉色。。
+                // 这属于硬编码禁止玩家改颜色了，要不还是换成那个 贴图？？
+                // 一会看看别的mod是如何处理这个问题的
+                if (i != 9 && i != 2)
+                {
+                    sLeaser.sprites[i].color = bodyColor_hard;
+                }
+                else
+                {
+                    sLeaser.sprites[i].color = eyesColor_hard;
+                }
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -106,10 +207,9 @@ class Plugin : BaseUnityPlugin
             if (!isInit)
             {
                 this.IsInit = true;
-                Futile.atlasManager.LoadAtlas("atlases/head");
-                Futile.atlasManager.LoadAtlas("atlases/tail");
-                Futile.atlasManager.LoadAtlas("atlases/face");
-                Futile.atlasManager.LoadAtlas("atlases/scarf");
+                Futile.atlasManager.LoadAtlas("atlases/fp_head");
+                Futile.atlasManager.LoadAtlas("atlases/fp_tail");
+                Futile.atlasManager.LoadAtlas("atlases/fp_face");
             }
         }
         catch (Exception ex)

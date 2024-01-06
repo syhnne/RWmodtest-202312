@@ -7,7 +7,7 @@
 
 		"color": "fe68ca",
 		"custom_colors": [
-			{ "name": "Body", "story": "fe68ca" },
+			{ "name": "Body", "story": "FFFFFF" },
 			{ "name": "Eyes", "story": "FFFFFF" }
 		],
 
@@ -33,7 +33,7 @@
 		"the_glow": true,
 
 		"guide_overseer": 1,
-		"start_room": "CC_A02",
+
 		"world_state": [ "PebblesSlug", "Artificer" ],
 		"diet": {
 			"base": "White",
