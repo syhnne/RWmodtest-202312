@@ -54,8 +54,22 @@ class Plugin : BaseUnityPlugin
 
     public PebblesSlugOption option;
     private bool IsInit;
+    private static List<int> ColoredBodyParts = new List<int>() { 2,5,6,7,8,9, };
 
-
+    /*
+     * 0: "BodyA"
+     * 1: "HipsA"
+     * 2: tail
+     * 3: "HeadA0"
+     * 4: "LegsA0"
+     * 5: "PlayerArm0", sLeaser.sprites[5].scaleY = -1f;
+     * 6: "PlayerArm0"
+     * 7: "OnTopOfTerrainHand"
+     * 8: "OnTopOfTerrainHand", sLeaser.sprites[8].scaleX = -1f;
+     * 9: "FaceA0"
+     * 10: "Futile_White", sLeaser.sprites[10].shader = rCam.game.rainWorld.Shaders["FlatLight"];
+     * 11: "pixel"
+     */
 
 
 
@@ -91,9 +105,7 @@ class Plugin : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            Debug.Log(DateTime.Now);
             Debug.LogException(ex);
-            base.Logger.LogMessage(DateTime.Now);
             base.Logger.LogError(ex);
         }
 
@@ -142,7 +154,7 @@ class Plugin : BaseUnityPlugin
                 triangleMesh.UVvertices[j].y = fatlas._elementsByName["fp_tail"].uvTopLeft.y;
             }
             sLeaser.sprites[2] = triangleMesh;
-
+            
             self.AddToContainer(sLeaser, rCam, null);
         }
     }
@@ -152,8 +164,28 @@ class Plugin : BaseUnityPlugin
         orig(self, sLeaser, rCam, timeStacker, camPos);
         if (IsMyCat.TryGet(self.player, out bool is_my_cat) && is_my_cat)
         {
-            sLeaser.sprites[2].element = Futile.atlasManager.GetElementWithName("fp_tail");
-            sLeaser.sprites[3].element = Futile.atlasManager.GetElementWithName("fp_head");
+            // 我知道了，问题大概在这里，我只给尾巴重新改了材质，剩下的材质都是加载了但是没用上。
+            // 理论上这个代码能简化一下，但我要先让它跑起来，剩下的我不敢动
+            for (int i = 0; i < sLeaser.sprites.Length; i++)
+            {
+                if (i == 2)
+                {
+                    sLeaser.sprites[2].element = Futile.atlasManager.GetElementWithName("fp_tail");
+                }
+                else
+                {
+                    if (sLeaser.sprites[i].element.name.StartsWith(sLeaser.sprites[i].element.name))
+                    {
+                        if (Futile.atlasManager.DoesContainElementWithName("fp_" + sLeaser.sprites[i].element.name))
+                        {
+                            sLeaser.sprites[i].element = Futile.atlasManager.GetElementWithName(sLeaser.sprites[i].element.name.Replace(sLeaser.sprites[i].element.name, "fp_" + sLeaser.sprites[i].element.name));
+                        }
+                        
+                    }
+                }
+                
+                
+            }
         }
     }
 
@@ -164,16 +196,15 @@ class Plugin : BaseUnityPlugin
         { 
             for (int i = 0; i < sLeaser.sprites.Length; i++)
             {
-                // 2是尾巴，9是眼睛，除此以外都涂成粉色。。
-                // 这属于硬编码禁止玩家改颜色了，要不还是换成那个 贴图？？
-                // 一会看看别的mod是如何处理这个问题的
-                if (i != 9 && i != 2)
+                // 2是尾巴，9是眼睛，56是手，除此以外都涂成粉色。。
+                // 这属于硬编码禁止玩家改颜色了，虽然我完全可以把所有颜色都换成贴图来解决这个问题，但我不想（
+                if (ColoredBodyParts.Contains(i))
                 {
-                    sLeaser.sprites[i].color = bodyColor_hard;
+                    sLeaser.sprites[i].color = eyesColor_hard;
                 }
                 else
                 {
-                    sLeaser.sprites[i].color = eyesColor_hard;
+                    sLeaser.sprites[i].color = bodyColor_hard;
                 }
             }
         }
@@ -209,7 +240,7 @@ class Plugin : BaseUnityPlugin
                 this.IsInit = true;
                 Futile.atlasManager.LoadAtlas("atlases/fp_head");
                 Futile.atlasManager.LoadAtlas("atlases/fp_tail");
-                Futile.atlasManager.LoadAtlas("atlases/fp_face");
+                Futile.atlasManager.LoadAtlas("atlases/fp_arm");
             }
         }
         catch (Exception ex)

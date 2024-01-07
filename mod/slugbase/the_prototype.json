@@ -7,8 +7,14 @@
 
 		"color": "fe68ca",
 		"custom_colors": [
-			{ "name": "Body", "story": "FFFFFF" },
-			{ "name": "Eyes", "story": "FFFFFF" }
+			{
+				"name": "Body",
+				"story": "FFFFFF"
+			},
+			{
+				"name": "Eyes",
+				"story": "FFFFFF"
+			}
 		],
 
 
@@ -16,7 +22,7 @@
 		"select_menu_scene_ascended": "Ghost_PebblesSlug",
 
 		"slugtemplate/is_my_cat": true,
-		"auto_grab_batflies": true,
+		"auto_grab_batflies": false,
 		"back_spear": false,
 		"weight": [ 0.9, 0.7 ],
 		"lung_capacity": [ 0.9, 0.7 ],
@@ -33,12 +39,13 @@
 		"the_glow": true,
 
 		"guide_overseer": 1,
-
+		"start_room": "CC_A02",
 		"world_state": [ "PebblesSlug", "Artificer" ],
 		"diet": {
 			"base": "White",
+			"meat": 0.5,
 			"corpses": 0.5,
-
+			"plants": 0.5,
 			"overrides": {
 				"SSOracleSwarmer": 0,
 				"SLOracleSwarmer": 0
