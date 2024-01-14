@@ -55,8 +55,9 @@ class Plugin : BaseUnityPlugin
     public static new ManualLogSource Logger { get; private set; }
 
     public PebblesSlugOption option;
+    private bool AddFoodByShock = false;
     private bool IsInit;
-    private static List<int> ColoredBodyParts = new List<int>() { 2, 3, 5, 6, 7, 8, 9, };
+    private static readonly List<int> ColoredBodyParts = new List<int>() { 2, 3, 5, 6, 7, 8, 9, };
 
     /*
      * 0: "BodyA"
@@ -91,18 +92,17 @@ class Plugin : BaseUnityPlugin
             On.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject_old;
             // IL.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject;
             IL.Player.GrabUpdate += Player_GrabUpdate;
-            On.Creature.Violence += Creature_Violence;
+            On.Creature.Violence += Creature_Violence_old;
             On.Player.CanBeSwallowed += Player_CanBeSwallowed;
 
-            // On.Room.PlaySound_SoundID_Vector2 += Room_PlaySound_SoundID_Vector2;
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
-
+            IL.ZapCoil.Update += ZapCoil_Update;
+            IL.Centipede.Shock += Centipede_Shock;
 
 
             On.PlayerGraphics.InitiateSprites += PlayerGraphics_InitiateSprites;
             On.PlayerGraphics.DrawSprites += PlayerGraphics_DrawSprites;
             On.PlayerGraphics.ApplyPalette += PlayerGraphics_ApplyPalette;
-
 
         }
         catch (Exception ex)
@@ -112,6 +112,36 @@ class Plugin : BaseUnityPlugin
         }
 
     }
+
+
+
+
+    // 噢噢噢哦哦哦哦哦哦哦哦！！（恍然大悟）
+    private void LoadResources(RainWorld rainWorld)
+    {
+        try
+        {
+            MachineConnector.SetRegisteredOI("PebblesSlug_by_syhnne", this.option);
+            bool isInit = this.IsInit;
+            if (!isInit)
+            {
+                this.IsInit = true;
+                Futile.atlasManager.LoadAtlas("atlases/fp_head");
+                Futile.atlasManager.LoadAtlas("atlases/fp_tail");
+                Futile.atlasManager.LoadAtlas("atlases/fp_arm");
+            }
+        }
+        catch (Exception ex)
+        {
+            base.Logger.LogError(ex);
+            throw;
+        }
+    }
+
+
+
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -160,6 +190,7 @@ class Plugin : BaseUnityPlugin
             self.AddToContainer(sLeaser, rCam, null);
         }
     }
+
 
     private void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
     {
@@ -216,6 +247,7 @@ class Plugin : BaseUnityPlugin
 
 
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -225,32 +257,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-
-
-
-
-
-    // 噢噢噢哦哦哦哦哦哦哦哦！！（恍然大悟）
-    private void LoadResources(RainWorld rainWorld)
-    {
-        try
-        {
-            MachineConnector.SetRegisteredOI("PebblesSlug_by_syhnne", this.option);
-            bool isInit = this.IsInit;
-            if (!isInit)
-            {
-                this.IsInit = true;
-                Futile.atlasManager.LoadAtlas("atlases/fp_head");
-                Futile.atlasManager.LoadAtlas("atlases/fp_tail");
-                Futile.atlasManager.LoadAtlas("atlases/fp_arm");
-            }
-        }
-        catch (Exception ex)
-        {
-            base.Logger.LogError(ex);
-            throw;
-        }
-    }
+    
 
 
 
@@ -271,9 +278,12 @@ class Plugin : BaseUnityPlugin
 
 
 
+
+
     // 不能免疫蜈蚣的电击，但我认为这不是我的问题，是蜈蚣的问题。
-    // 算了吧，要是连这都免疫，那就太超模了（
-    private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
+    // 错了，好像是我的问题，这个violence怎么说
+    // 没事了，确实是蜈蚣的问题，大蜈蚣电击致死是硬编码的
+    private void Creature_Violence_old(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
     {
         if (self is Player && (self as Player).slugcatStats.name.value == "PebblesSlug")
         {
@@ -299,9 +309,10 @@ class Plugin : BaseUnityPlugin
 
     // 除了特效以外，数值跟炸猫差不多，因为我不知道那堆二段跳的数值怎么改。我想改得小一点，让他没有那么强的机动性，不然太超模了（
     // 因为这个电击在水下是有伤害的（痛击你的队友。jpg）我不是故意的，我是真的写不出来那个判定。我不知道他为什么会闪退。。
-    // 我大概应该用原版方法，然后做ilhooking。啊？什么？我用了？
+    // 我大概应该用原版方法，然后做ilhooking。但是，说真的，想想那个工作量吧（汗）我都不太清楚自己究竟改了些什么
     private void Player_ClassMechanicsArtificer(On.Player.orig_ClassMechanicsArtificer orig, Player self)
     {
+        // Debug.Log("====++ slugcat name: "+ self.slugcatStats.name.value);
         if (self.slugcatStats.name.value == "PebblesSlug")
         {
             Room room = self.room;
@@ -498,7 +509,6 @@ class Plugin : BaseUnityPlugin
                     self.room.AddObject(new Spark(pos2 + vector2 * Random.value * 40f, vector2 * Mathf.Lerp(4f, 30f, Random.value), Color.white, null, 4, 18));
                 }
                 self.room.AddObject(new ShockWave(pos2, 200f, 0.2f, 6, false));
-                // self.room.AddObject(new ExplosionEffect());
                 self.room.PlaySound(SoundID.Flare_Bomb_Burn, pos2);
                 // self.room.PlaySound(SoundID.Zapper_Zap, pos2, 1f, 0.2f + 0.25f * Random.value);
                 // self.room.PlaySound(SoundID.Fire_Spear_Explode, pos2, 0.3f + Random.value * 0.3f, 0.5f + Random.value * 2f);
@@ -611,6 +621,8 @@ class Plugin : BaseUnityPlugin
 
 
 
+
+
     private AbstractPhysicalObject.AbstractObjectType Player_CraftingResults(On.Player.orig_CraftingResults orig, Player self)
     {
         if (self.slugcatStats.name.value == "PebblesSlug")
@@ -652,6 +664,10 @@ class Plugin : BaseUnityPlugin
     }
 
 
+
+
+
+
     private bool Player_GraspsCanBeCrafted(On.Player.orig_GraspsCanBeCrafted orig, Player self)
     {
 
@@ -661,6 +677,8 @@ class Plugin : BaseUnityPlugin
         }
         return orig(self);
     }
+
+
 
 
 
@@ -712,6 +730,10 @@ class Plugin : BaseUnityPlugin
 
 
 
+
+
+
+
     private void Player_SpitUpCraftedObject(ILContext il)
     {
         ILCursor c = new(il);
@@ -727,6 +749,11 @@ class Plugin : BaseUnityPlugin
             Debug.Log("====++ Match successfully! - Player_SpitUpCraftedObject");
         }
     }
+
+
+
+
+
 
 
     private void Player_SpitUpCraftedObject_old(On.Player.orig_SpitUpCraftedObject orig, Player self)
@@ -825,10 +852,6 @@ class Plugin : BaseUnityPlugin
     // 啊！！终于把原来那一坨复制粘贴删了！！感觉像新年的第一天穿上新内裤一样清爽啊！！
     private void Player_GrabUpdate(ILContext il)
     {
-        // 我试的那个判定不行，所以这咋判定？
-        // 好吧，只能这样了。
-
-
         ILCursor c = new ILCursor(il);
         // 337末尾，修改神经元的可食用性。没错，我要借用一下他自带的那个brfalse。。因为我自己不会写！！
         if (c.TryGotoNext(MoveType.After,
@@ -840,7 +863,7 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Callvirt)
             ))
         {
-            Debug.Log("====++ match successfully: neuron fly");
+            Debug.Log("====++ match successfully! - neuron fly");
             // 啊哈！我是天才！
             // 怎么解决brfalse无法定位的问题：不要用自己的brfalse，直接绑架一个他原本的判断，然后把那个判断的输出结果和我加的判断绑在一起。反正他们是and关系
             // 这样一来，比原本直接改player_grabupdate的方法更加方便，因为另一个地方我就不用改了。
@@ -862,22 +885,117 @@ class Plugin : BaseUnityPlugin
         }
 
         // 533末尾，骗代码说我是工匠，让我合成
-        // 这里可能有问题，我试过联机队友是求生者的话没bug，但要是饕餮或者工匠，我不好说
+        // 有的人没发现自己指针定位错了，白修一个小时bug，我不说是谁
         ILCursor c2 = new ILCursor(il);
         if (c2.TryGotoNext(MoveType.After,
-            (i) => i.Match(OpCodes.Brfalse_S),
-            (i) => i.MatchLdarg(0),
-            (i) => i.Match(OpCodes.Call),
-            (i) => i.Match(OpCodes.Ldc_I4_M1)
+            (i) => i.Match(OpCodes.Ldc_I4_M1),
+            (i) => i.Match(OpCodes.Beq_S),
+            (i) => i.Match(OpCodes.Ldarg_0),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldsfld),
+            (i) => i.Match(OpCodes.Call)
             ))
         {
-            Debug.Log("====++ CMON WHY ISNT IT WORKING");
-            c2.EmitDelegate<Func<bool, bool>>((isArtificer) => 
-            { 
-                return true; 
+            Debug.Log("====++ Match successfully! - isArtificer");
+            c2.Emit(OpCodes.Ldarg_0);
+            c2.EmitDelegate<Func<bool, Player, bool>>((isArtificer, self) => 
+            {
+                if (self.slugcatStats.name.value == "PebblesSlug")
+                {
+                    return true;
+                }
+                else { return isArtificer; }
+                    
+            });
+        }
+        
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    // 被电不仅不会死，还会吃饱（？
+    private void ZapCoil_Update(ILContext il)
+    {
+        ILCursor c = new ILCursor(il);
+        // 182，还是那个劫持判定
+        if (c.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Stfld),
+            (i) => i.MatchLdarg(0),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldloc_1),
+            (i) => i.Match(OpCodes.Ldelem_Ref),
+            (i) => i.Match(OpCodes.Ldloc_2),
+            (i) => i.Match(OpCodes.Callvirt)
+            ))
+        {
+            c.EmitDelegate<Func<PhysicalObject, PhysicalObject>>((physicalObj) =>
+            {
+                Debug.Log("====++ Match successfully! - ZapCoil");
+                if (physicalObj is Player && (physicalObj as Player).slugcatStats.name.value == "PebblesSlug")
+                {
+                    (physicalObj as Player).Stun(200);
+                    if (AddFoodByShock)
+                    {
+                        int maxfood = (physicalObj as Player).MaxFoodInStomach;
+                        int food = (physicalObj as Player).FoodInStomach;
+                        Debug.Log("====++ food:" + food + " maxfood: " + maxfood);
+                        (physicalObj as Player).AddFood(maxfood - food);
+                    }
+                    return null;
+                }
+                else { return physicalObj; }
             });
         }
     }
+
+
+
+
+
+
+
+    // 同理，现在可以免疫蜈蚣的电击，甚至吃上一顿
+    private void Centipede_Shock(ILContext il)
+    {
+         ILCursor c = new ILCursor(il);
+        // 226，还是那个劫持判定，修改蜈蚣的体重让他无论如何都会小于玩家体重
+        if (c.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Br),
+            (i) => i.Match(OpCodes.Ldarg_1),
+            (i) => i.Match(OpCodes.Callvirt),
+            (i) => i.Match(OpCodes.Ldarg_0),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - CentipedeShock");
+            c.Emit(OpCodes.Ldarg_1);
+            c.EmitDelegate<Func<float, PhysicalObject, float>>((centipedeMass, physicalObj) =>
+            {
+                Debug.Log("====++ Match successfully! - CentipedeShock, centipede mass: "+ centipedeMass);
+                if (physicalObj is Player && (physicalObj as Player).slugcatStats.name.value == "PebblesSlug") 
+                {
+                    if (AddFoodByShock && (physicalObj as Player).FoodInStomach < (physicalObj as Player).MaxFoodInStomach)
+                    {
+                        (physicalObj as Player).AddFood(1);
+                    }
+                    return 0;
+                }
+                else { return centipedeMass; }
+            });
+        }
+    }
+
+
 }
 
 

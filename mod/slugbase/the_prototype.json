@@ -41,12 +41,12 @@
 
 		"guide_overseer": 1,
 		"start_room": "CC_A02",
-		"world_state": [ "PebblesSlug", "Artificer" ],
+		"world_state": [ "PebblesSlug", "Spear" ],
 		"diet": {
 			"base": "White",
-			"meat": 0.5,
+			"meat": 0.25,
 			"corpses": 0.5,
-			"plants": 0.5,
+			"plants": 0.25,
 			"overrides": {
 				"SSOracleSwarmer": 0,
 				"SLOracleSwarmer": 0
