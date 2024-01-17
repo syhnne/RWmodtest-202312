@@ -22,6 +22,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SlugBase.DataTypes;
+using MonoMod.RuntimeDetour;
+using System.Reflection;
 
 
 
@@ -59,6 +61,12 @@ class Plugin : BaseUnityPlugin
     private bool IsInit;
     private static readonly List<int> ColoredBodyParts = new List<int>() { 2, 3, 5, 6, 7, 8, 9, };
 
+    // 以下自定义属性会覆盖slugbase的属性，我的建议是别改，尤其别改slugbase那边的（经测试这玩意有bug，如果改了slugbase那边的数据，饱食度会变成默认的4/7。
+    // 我想过直接获取slugbase那边的数据，但我看他没想让我获取。大约slugbase的作者也想不到我有这样奇葩的需求罢。
+    private static readonly int Cycles = 21;
+    private static readonly int MaxFood = 8;
+    private static readonly int MinFood = 5;
+
     /*
      * 0: "BodyA"
      * 1: "HipsA"
@@ -90,10 +98,14 @@ class Plugin : BaseUnityPlugin
             On.Player.GraspsCanBeCrafted += Player_GraspsCanBeCrafted;
             // On.Player.SwallowObject += Player_SwallowObject;
             On.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject_old;
-            // IL.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject;
             IL.Player.GrabUpdate += Player_GrabUpdate;
-            On.Creature.Violence += Creature_Violence_old;
+            On.Creature.Violence += Creature_Violence;
             On.Player.CanBeSwallowed += Player_CanBeSwallowed;
+            On.Player.ThrownSpear += Player_ThrownSpear;
+            On.Player.Jump += Player_Jump;
+
+            On.Player.ctor += Player_ctor;
+            On.Player.Update += Player_Update;
 
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
             IL.ZapCoil.Update += ZapCoil_Update;
@@ -103,6 +115,27 @@ class Plugin : BaseUnityPlugin
             On.PlayerGraphics.InitiateSprites += PlayerGraphics_InitiateSprites;
             On.PlayerGraphics.DrawSprites += PlayerGraphics_DrawSprites;
             On.PlayerGraphics.ApplyPalette += PlayerGraphics_ApplyPalette;
+
+
+            new Hook(
+            typeof(RedsIllness).GetProperty(nameof(RedsIllness.TimeFactor), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            RedsIllness_FoodToBeOkay
+            );
+
+            new Hook(
+            typeof(RedsIllness).GetProperty(nameof(RedsIllness.FoodFac), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            RedsIllness_FoodFac
+            );
+
+            new Hook(
+            typeof(RedsIllness).GetProperty(nameof(RedsIllness.TimeFactor), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            RedsIllness_TimeFactor
+            );
+            
+
+            
+
+
 
         }
         catch (Exception ex)
@@ -115,8 +148,6 @@ class Plugin : BaseUnityPlugin
 
 
 
-
-    // 噢噢噢哦哦哦哦哦哦哦哦！！（恍然大悟）
     private void LoadResources(RainWorld rainWorld)
     {
         try
@@ -140,7 +171,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-
+    // 图形
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -192,6 +223,8 @@ class Plugin : BaseUnityPlugin
     }
 
 
+
+
     private void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
     {
         orig(self, sLeaser, rCam, timeStacker, camPos);
@@ -222,6 +255,8 @@ class Plugin : BaseUnityPlugin
         }
     }
 
+
+
     private void PlayerGraphics_ApplyPalette(On.PlayerGraphics.orig_ApplyPalette orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
     {
         orig(self, sLeaser, rCam, palette);
@@ -247,8 +282,33 @@ class Plugin : BaseUnityPlugin
 
 
 
+
+
+
+
+    // 游戏流程
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    private void ProcessManager_CreateValidationLabel(ILContext il)
+    {
+        ILCursor c = new ILCursor(il);
+        // 25
+        if (c.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Ldloc_2),
+            (i) => i.Match(OpCodes.Brfalse),
+            (i) => i.Match(OpCodes.Ldloc_1),
+            (i) => i.Match(OpCodes.Ldsfld),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - ProcessManager_CreateValidationLabel");
+            c.Emit(OpCodes.Ldloc_1);
+            c.EmitDelegate<Func<bool, SlugcatStats.Name, bool>>((isRed, name) =>
+            {
+                return isRed || name.value == "PebblesSlug";
+            });
+        }
+    }
 
 
 
@@ -257,12 +317,125 @@ class Plugin : BaseUnityPlugin
 
 
 
-    
+
+
+    // 香菇病
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // 从珍珠猫代码里抄的，总之这么写能跑，那就这么写吧（
+    private delegate float orig_RedsIllnessFoodFac(RedsIllness self);
+    private float RedsIllness_FoodFac(orig_RedsIllnessFoodFac orig, RedsIllness self)
+    {
+        var result = orig(self);
+        if (self.player.slugcatStats.name.value == "PebblesSlug")
+        {
+            result = Mathf.Max(0.25f, 1f / ((float)self.cycle * 0.25f + 1f));
+        }
+        return result;
+    }
+
+
+
+    private delegate float orig_RedsIllnessFoodToBeOkay(RedsIllness self);
+    private float RedsIllness_FoodToBeOkay(orig_RedsIllnessFoodToBeOkay orig, RedsIllness self)
+    {
+        var result = orig(self);
+        if (self.player.slugcatStats.name.value == "PebblesSlug")
+        {
+            result = self.player.slugcatStats.foodToHibernate;
+        }
+        return result;
+    }
+
+
+
+    private delegate float orig_RedsIllnessTimeFactor(RedsIllness self);
+    private float RedsIllness_TimeFactor(orig_RedsIllnessTimeFactor orig, RedsIllness self)
+    {
+        var result = orig(self);
+        if (self.player.slugcatStats.name.value == "PebblesSlug")
+        {
+            result = 1f - 0.7f * Mathf.Max(Mathf.Max(self.fadeOutSlow ? Mathf.Pow(Mathf.InverseLerp(0f, 0.5f, self.player.abstractCreature.world.game.manager.fadeToBlack), 0.65f) : 0f, Mathf.InverseLerp(40f * Mathf.Lerp(12f, 21f, self.Severity), 40f, (float)self.counter) * Mathf.Lerp(0.2f, 0.5f, self.Severity)), self.CurrentFitIntensity * 0.1f);
+        }
+        return result;
+    }
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+    private void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
+    {
+        orig(self, abstractCreature, world);
+        if (self.slugcatStats.name.value == "PebblesSlug" && !self.playerState.isGhost && world.game.session is StoryGameSession)
+        {
+            int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
+            if (cycle >= 5)
+            {
+                // 我敲，后面这个cycle指的是香菇病的cycle而不是游戏流程（汗）
+                self.redsIllness = new RedsIllness(self, cycle - 5);
+            }
+
+
+            // 由于今天没有在避难所里狂按q的心情，下面这段代码还没有得到测试，不知道他能不能跑
+            Debug.Log("====++ Player_ctor - cycle:" + cycle);
+            float f = (cycle / Cycles) * (MaxFood - MinFood);
+            int result = MinFood + (int)Math.Floor(f);
+            self.slugcatStats.foodToHibernate = (result < MaxFood)? result : MaxFood;
+            self.slugcatStats.maxFood = MaxFood;
+            Debug.Log("====++ Player_ctor - food to hibernate:" + self.slugcatStats.foodToHibernate);
+
+
+        }
+
+        
+    }
+
+
+
+    private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
+    {
+        orig(self, eu);
+        self.redsIllness?.Update();
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // 玩家技能
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
     // 不能吃神经元。我想这个应该用不着调用原版方法了吧。。
@@ -278,32 +451,37 @@ class Plugin : BaseUnityPlugin
 
 
 
-
-
-    // 不能免疫蜈蚣的电击，但我认为这不是我的问题，是蜈蚣的问题。
-    // 错了，好像是我的问题，这个violence怎么说
-    // 没事了，确实是蜈蚣的问题，大蜈蚣电击致死是硬编码的
-    private void Creature_Violence_old(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
+    private void Player_Jump(On.Player.orig_Jump orig, Player self)
     {
-        if (self is Player && (self as Player).slugcatStats.name.value == "PebblesSlug")
-        {
-            if (type == Creature.DamageType.Electric)
-            {
-                Debug.Log("==== DAMAGE TYPE: electric");
-                // 现在是0做测试用，检测哪些死法是通过这个函数传进来的
-                // damage = 0;
-                // stunBonus = 0;
-                damage = 0.1f * damage;
-                stunBonus = 0.1f * stunBonus;
-            }
+        orig(self);
+        if (self.slugcatStats.name.value == "PebblesSlug")
+        { 
+            self.jumpBoost *= 1.2f;
         }
-        orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
     }
 
 
 
+    // 一矛超人，只要不使用二段跳，就是常驻2倍矛伤。使用二段跳会导致这个伤害发生衰减，最低不低于0.5。修改slugbase的基础矛伤可以使所有的值发生变化
+    private void Player_ThrownSpear(On.Player.orig_ThrownSpear orig, Player self, Spear spear)
+    {
+        orig(self, spear);
+        if (self.slugcatStats.name.value == "PebblesSlug")
+        {
+            float spearDmgBonus = 1.5f;
+            if (self.pyroJumpCounter > 0)
+            {
+                spearDmgBonus /= self.pyroJumpCounter;
+            }
+            spear.spearDamageBonus *= (0.5f + spearDmgBonus);
+            Debug.Log("====++ spearDmgBonus: " + (0.5f+spearDmgBonus) + "  result: " + spear.spearDamageBonus);
+        }
+        
+    }
 
 
+
+    
 
 
 
@@ -376,22 +554,19 @@ class Plugin : BaseUnityPlugin
                 // 哦不，这是有烟无伤的二段跳
                 // 现在有伤害了，只要你在水里起跳，就会让附近生物触电，只不过没什么伤害
 
-                // for (int i = 0; i < 8; i++)
-                // { self.room.AddObject(new Explosion.ExplosionSmoke(pos, Custom.RNV() * 5f * Random.value, 1f)); }
+
                 for (int i = 0; i < 8; i++)
                 {
                     Vector2 vector = Custom.DegToVec(360f * Random.value);
                     self.room.AddObject(new MouseSpark(pos + vector * 9f, self.firstChunk.vel + vector * 36f * Random.value, 20f, new Color(0.7f, 1f, 1f)));
                 }
                 self.room.AddObject(new Explosion.ExplosionLight(pos, 200f, 1f, 4, new Color(0.7f, 1f, 1f)));
-                // self.room.AddObject(new Explosion.ExplosionLight(pos, 160f, 1f, 3, Color.white));
                 for (int j = 0; j < 10; j++)
                 {
                     Vector2 vector = Custom.RNV();
                     self.room.AddObject(new Spark(pos + vector * Random.value * 40f, vector * Mathf.Lerp(4f, 30f, Random.value), Color.white, null, 4, 18));
                 }
                 self.room.PlaySound(SoundID.Jelly_Fish_Tentacle_Stun, self.firstChunk.pos);
-                // self.room.PlaySound(SoundID.Fire_Spear_Explode, pos, 0.3f + Random.value * 0.3f, 0.5f + Random.value * 2f);
                 self.room.InGameNoise(new InGameNoise(pos, 8000f, self, 1f));
                 int num2 = Mathf.Max(1, explosionCapacity - 3);
                 if (self.Submersion <= 0.5f)
@@ -458,8 +633,11 @@ class Plugin : BaseUnityPlugin
                 }
                 if (self.pyroJumpCounter >= explosionCapacity)
                 {
-                    // Player没有有关被电死的代码，而且我找不到fp里面那个能电死猫的电池代码在哪（扶额
-                    self.PyroDeath();
+                    self.room.AddObject(new ShockWave(pos, 200f, 0.2f, 6, false));
+                    self.room.AddObject(new Explosion(self.room, self, pos, 7, 350f, 26.2f, 2f, 280f, 0.35f, self, 0.7f, 160f, 1f));
+                    self.room.ScreenMovement(new Vector2?(pos), default(Vector2), 1.3f);
+                    self.room.InGameNoise(new InGameNoise(pos, 9000f, self, 1f));
+                    self.Die();
                 }
 
             }
@@ -497,11 +675,9 @@ class Plugin : BaseUnityPlugin
                     Vector2 vector3 = Custom.DegToVec(360f * Random.value);
                     self.room.AddObject(new MouseSpark(pos2 + vector3 * 9f, self.firstChunk.vel + vector3 * 36f * Random.value, 20f, new Color(0.7f, 1f, 1f)));
                 }
-                // for (int k = 0; k < 8; k++)
-                // { self.room.AddObject(new Explosion.ExplosionSmoke(pos2, Custom.RNV() * 5f * Random.value, 1f)); }
+
 
                 self.room.AddObject(new Explosion.ExplosionLight(pos2, 200f, 1f, 4, new Color(0.7f, 1f, 1f)));
-                // self.room.AddObject(new Explosion.ExplosionLight(pos2, 160f, 1f, 3, Color.white));
 
                 for (int l = 0; l < 8; l++)
                 {
@@ -509,8 +685,10 @@ class Plugin : BaseUnityPlugin
                     self.room.AddObject(new Spark(pos2 + vector2 * Random.value * 40f, vector2 * Mathf.Lerp(4f, 30f, Random.value), Color.white, null, 4, 18));
                 }
                 self.room.AddObject(new ShockWave(pos2, 200f, 0.2f, 6, false));
-                self.room.PlaySound(SoundID.Flare_Bomb_Burn, pos2);
+                self.room.AddObject(new ZapCoil.ZapFlash(pos2, 10f));
+                // self.room.PlaySound(SoundID.Flare_Bomb_Burn, pos2);
                 // self.room.PlaySound(SoundID.Zapper_Zap, pos2, 1f, 0.2f + 0.25f * Random.value);
+                self.room.PlaySound(SoundID.Zapper_Zap, pos2, 1f, 1f + 0.25f * Random.value);
                 // self.room.PlaySound(SoundID.Fire_Spear_Explode, pos2, 0.3f + Random.value * 0.3f, 0.5f + Random.value * 2f);
                 self.room.InGameNoise(new InGameNoise(pos2, 8000f, self, 1f));
 
@@ -594,6 +772,9 @@ class Plugin : BaseUnityPlugin
                 if (self.pyroJumpCounter >= explosionCapacity)
                 {
                     self.room.AddObject(new ShockWave(pos2, 200f, 0.2f, 6, false));
+                    self.room.AddObject(new Explosion(self.room, self, pos2, 7, 350f, 26.2f, 2f, 280f, 0.35f, self, 0.7f, 160f, 1f));
+                    self.room.ScreenMovement(new Vector2?(pos2), default(Vector2), 1.3f);
+                    self.room.InGameNoise(new InGameNoise(pos2, 9000f, self, 1f));
                     self.Die();
                 }
             }
@@ -742,7 +923,7 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call),
             (i) => i.Match(OpCodes.Brfalse),
             (i) => i.MatchLdloc(2),
-            (i) => i.MatchIsinst("AbstractSpear"),
+            (i) => i.Match(OpCodes.Isinst),
             (i) => i.Match(OpCodes.Ldfld)
             ))
         {
@@ -995,6 +1176,27 @@ class Plugin : BaseUnityPlugin
         }
     }
 
+
+
+
+
+
+
+    // 不能免疫蜈蚣的电击，但我认为这不是我的问题，是蜈蚣的问题。
+    // 错了，好像是我的问题，这个violence怎么说
+    // 没事了，确实是蜈蚣的问题，大蜈蚣电击致死是硬编码的
+    private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
+    {
+        if (self is Player && (self as Player).slugcatStats.name.value == "PebblesSlug")
+        {
+            if (type == Creature.DamageType.Electric)
+            {
+                damage = 0.1f * damage;
+                stunBonus = 0.1f * stunBonus;
+            }
+        }
+        orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
+    }
 
 }
 
