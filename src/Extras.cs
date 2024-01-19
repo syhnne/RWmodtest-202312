@@ -7,7 +7,7 @@ using UnityEngine;
  * Unless you know what you're doing, you shouldn't modify anything here.
  */
 
-// Allows access to private members
+// Allows access to internal members
 #pragma warning disable CS0618
 [assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
 #pragma warning restore CS0618
@@ -15,7 +15,7 @@ using UnityEngine;
 
 internal static class Extras
 {
-    private static bool _initialized;
+    internal static bool _initialized;
 
     // Ensure resources are only loaded once and that failing to load them will not break other mods
     public static On.RainWorld.hook_OnModsInit WrapInit(Action<RainWorld> loadResources)

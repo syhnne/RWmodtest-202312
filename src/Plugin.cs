@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using SlugBase.DataTypes;
 using MonoMod.RuntimeDetour;
 using System.Reflection;
+using SlugBase.SaveData;
 
 
 
@@ -32,7 +33,7 @@ using System.Reflection;
 
 namespace PebblesSlug;
 
-
+// 吾日三省吾身：加判定了吗？指针定位写对了吗？挂hook了吗？
 
 
 
@@ -42,30 +43,31 @@ namespace PebblesSlug;
 [BepInPlugin(MOD_ID, "PebblesSlug", "0.1.0")]
 class Plugin : BaseUnityPlugin
 {
-    private const string MOD_ID = "PebblesSlug_by_syhnne";
+    internal const string MOD_ID = "PebblesSlug_by_syhnne";
 
 
 
     // 不要给猫改名！！！不要给猫改名！！！不要给猫改名！！！
 
-    private static readonly Color32 bodyColor_hard = new Color32(254, 104, 202, 255);
-    private static readonly Color eyesColor_hard = new Color(1f, 1f, 1f);
+    internal static readonly Color32 bodyColor_hard = new Color32(254, 104, 202, 255);
+    internal static readonly Color eyesColor_hard = new Color(1f, 1f, 1f);
 
     public static readonly PlayerFeature<Color> BodyColor = PlayerColor("Body");
     public static readonly PlayerFeature<Color> EyesColor = PlayerColor("Eyes");
 
-    public static new ManualLogSource Logger { get; private set; }
+    public static new ManualLogSource Logger { get; internal set; }
 
     public PebblesSlugOption option;
-    private bool AddFoodByShock = false;
-    private bool IsInit;
-    private static readonly List<int> ColoredBodyParts = new List<int>() { 2, 3, 5, 6, 7, 8, 9, };
+    internal bool AddFoodByShock = false;
+    internal bool IsInit;
+    internal static readonly List<int> ColoredBodyParts = new List<int>() { 2, 3, 5, 6, 7, 8, 9, };
 
     // 以下自定义属性会覆盖slugbase的属性，我的建议是别改，尤其别改slugbase那边的（经测试这玩意有bug，如果改了slugbase那边的数据，饱食度会变成默认的4/7。
     // 我想过直接获取slugbase那边的数据，但我看他没想让我获取。大约slugbase的作者也想不到我有这样奇葩的需求罢。
-    private static readonly int Cycles = 21;
-    private static readonly int MaxFood = 8;
-    private static readonly int MinFood = 5;
+    internal static readonly int Cycles = 21;
+    internal static readonly int MaxFood = 8;
+    internal int MinFoodNow = 5;
+    internal static readonly int MinFood = 5;
 
     /*
      * 0: "BodyA"
@@ -105,6 +107,7 @@ class Plugin : BaseUnityPlugin
             On.Player.Jump += Player_Jump;
 
             On.Player.ctor += Player_ctor;
+            
             On.Player.Update += Player_Update;
 
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
@@ -115,6 +118,19 @@ class Plugin : BaseUnityPlugin
             On.PlayerGraphics.InitiateSprites += PlayerGraphics_InitiateSprites;
             On.PlayerGraphics.DrawSprites += PlayerGraphics_DrawSprites;
             On.PlayerGraphics.ApplyPalette += PlayerGraphics_ApplyPalette;
+
+            // IL.SlugcatStats.ctor += IL_SlugcatStats_ctor;
+            On.SlugcatStats.SlugcatFoodMeter += SlugcatStats_SlugcatFoodMeter;
+
+
+
+            // 急 下面这俩貌似是根本没挂上 他妈的怎么回事 这三个都挂不上我操
+            IL.HUD.Map.CycleLabel.UpdateCycleText += HUD_Map_CycleLabel_UpdateCycleText;
+            IL.HUD.SubregionTracker.Update += HUD_SubregionTracker_Update;
+            // IL.ProcessManager.CreateValidationLabel += ProcessManager_CreateValidationLabel;
+            IL.Menu.SlugcatSelectMenu.SlugcatPageContinue.ctor += Menu_SlugcatSelectMenu_SlugcatPageContinue_ctor;
+            On.Menu.SlugcatSelectMenu.SlugcatPageContinue.Update += Menu_SlugcatSelectMenu_SlugcatPageContinue_Update;
+
 
 
             new Hook(
@@ -131,8 +147,12 @@ class Plugin : BaseUnityPlugin
             typeof(RedsIllness).GetProperty(nameof(RedsIllness.TimeFactor), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
             RedsIllness_TimeFactor
             );
-            
 
+            
+            new Hook(
+            typeof(SaveState).GetProperty(nameof(SaveState.SlowFadeIn), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            SaveState_SlowFadeIn
+            );
             
 
 
@@ -148,7 +168,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void LoadResources(RainWorld rainWorld)
+    internal void LoadResources(RainWorld rainWorld)
     {
         try
         {
@@ -172,13 +192,13 @@ class Plugin : BaseUnityPlugin
 
 
     // 图形
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // 因为根本不会C#所以把图形和技能全写一起了
-    private void PlayerGraphics_InitiateSprites(On.PlayerGraphics.orig_InitiateSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+
+
+
+
+    internal void PlayerGraphics_InitiateSprites(On.PlayerGraphics.orig_InitiateSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
     {
         orig(self, sLeaser, rCam);
         if (self.player.slugcatStats.name.value == "PebblesSlug")
@@ -225,7 +245,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+    internal void PlayerGraphics_DrawSprites(On.PlayerGraphics.orig_DrawSprites orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
     {
         orig(self, sLeaser, rCam, timeStacker, camPos);
         if (self.player.slugcatStats.name.value == "PebblesSlug")
@@ -257,7 +277,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void PlayerGraphics_ApplyPalette(On.PlayerGraphics.orig_ApplyPalette orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
+    internal void PlayerGraphics_ApplyPalette(On.PlayerGraphics.orig_ApplyPalette orig, PlayerGraphics self, RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, RoomPalette palette)
     {
         orig(self, sLeaser, rCam, palette);
         if (self.player.slugcatStats.name.value == "PebblesSlug")
@@ -282,14 +302,210 @@ class Plugin : BaseUnityPlugin
 
 
 
+    // 游戏界面
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    // 原来挂不上是一个函数导致所有的都挂不上。。。这下应该是修好了，只是这个map上面也有显示循环数的东西么，我怎么不知道
+    internal void HUD_Map_CycleLabel_UpdateCycleText(ILContext il)
+    {
+        Debug.Log("====++ HUD_Map_CycleLabel_UpdateCycleText");
+        ILCursor c = new ILCursor(il);
+        // 23 修改判定
+        if (c.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Isinst),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldsfld),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - HUD_Map_CycleLabel_UpdateCycleText - 23");
+            c.Emit(OpCodes.Ldloc_0); //Player
+            c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
+            {
+                return isRed || player.slugcatStats.name.value == "PebblesSlug";
+            });
+        }
+        ILCursor c2 = new ILCursor(il);
+        // 32 改数值
+        if (c2.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Callvirt),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Callvirt),
+            (i) => i.Match(OpCodes.Callvirt),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - HUD_Map_CycleLabel_UpdateCycleText - 32");
+            c2.Emit(OpCodes.Ldloc_0); //Player
+            c2.EmitDelegate<Func<int, Player, int>>((redsCycles, player) =>
+            {
+                if (player.slugcatStats.name.value == "PebblesSlug")
+                {
+                    return Cycles;
+                }
+                return redsCycles;
+            });
+        }
+    }
+
+
+
+    // 这就是到了烟囱天棚出生那个房间，底下会显示一行字的时候显示的循环数
+    internal void HUD_SubregionTracker_Update(ILContext il)
+    {
+        Debug.Log("====++ HUD_SubregionTracker_Update");
+        ILCursor c = new ILCursor(il);
+        // 164 修改是否是红猫的判定
+        if (c.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Isinst),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldsfld),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - HUD_SubregionTracker_Update - 164");
+            c.Emit(OpCodes.Ldloc_0);
+            c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
+            {
+                Debug.Log("====++ Emit Delegate - HUD_SubregionTracker_Update - 164 !!!!!!!!!!");
+                return isRed || player.slugcatStats.name.value == "PebblesSlug";
+            });
+        }
+
+        ILCursor c2 = new ILCursor(il);
+        // 175 修改RedsCycles函数返回值 啊 我恨死这个静态函数了
+        if (c2.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Ldloc_0),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Callvirt),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - HUD_SubregionTracker_Update - 175");
+            c2.Emit(OpCodes.Ldloc_0);
+            c2.EmitDelegate<Func<int, Player, int>>((RedsCycles, player) =>
+            {
+                if (player.slugcatStats.name.value == "PebblesSlug")
+                {
+                    Debug.Log("====++ Emit Delegate - HUD_SubregionTracker_Update - 175 !!!!!!!!!!");
+                    return Cycles;
+                }
+                return RedsCycles;
+            });
+        }
+    }
+
+
+
+
+
+
+
+    internal void Menu_SlugcatSelectMenu_SlugcatPageContinue_Update(On.Menu.SlugcatSelectMenu.SlugcatPageContinue.orig_Update orig, Menu.SlugcatSelectMenu.SlugcatPageContinue self)
+    {
+
+        orig(self);
+    }
+
+
+
+    // 终于修好了。。这个b函数折磨了我一个晚上。。
+    internal void Menu_SlugcatSelectMenu_SlugcatPageContinue_ctor(ILContext il)
+    {
+        ILCursor c = new ILCursor(il);
+        // 247 修改雨循环显示逻辑
+        if (c.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Dup),
+            (i) => i.Match(OpCodes.Ldc_I4_4),
+            (i) => i.Match(OpCodes.Ldarg_S),
+            (i) => i.Match(OpCodes.Ldsfld),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - Menu_SlugcatSelectMenu_SlugcatPageContinue_ctor - 247");
+            // 我高度怀疑这个要卡bug
+            c.Emit(OpCodes.Ldarg, 4); 
+            c.EmitDelegate<Func<bool, SlugcatStats.Name, bool>>((isRed, name) =>
+            {
+                return isRed || name.value == "PebblesSlug";
+            });
+        }
+        
+        ILCursor c2 = new ILCursor(il);
+        // 189 修改食物条显示 不要动这个计算逻辑，他和楼下那个实际计算食物条的东西是完全一样的
+        if (c2.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldarg_S),
+            (i) => i.Match(OpCodes.Call),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldarg_S),
+            (i) => i.Match(OpCodes.Call),
+            (i) => i.Match(OpCodes.Ldfld)
+            
+            ))
+        {
+            c2.Emit(OpCodes.Ldarg, 4);
+            c2.Emit(OpCodes.Ldarg_0);
+            c2.EmitDelegate<Func<int, SlugcatStats.Name, Menu.SlugcatSelectMenu.SlugcatPageContinue, int>>((foodToHibernate, name, menu) =>
+            {
+                if (name.value == "PebblesSlug")
+                {
+                    int cycle = menu.saveGameData.cycle;
+                    int result = MinFood + (int)Math.Floor((float)cycle / Cycles * (MaxFood + 1 - MinFood));
+                    return result;
+                }
+                return foodToHibernate;
+            });
+        }
+
+        ILCursor c3 = new ILCursor(il);
+        // 256 修改雨循环显示数字
+        if (c3.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Br_S),
+            (i) => i.Match(OpCodes.Ldarg_0),
+            (i) => i.Match(OpCodes.Call),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Call)
+            ))
+        {
+            Debug.Log("====++ Match successfully! - Menu_SlugcatSelectMenu_SlugcatPageContinue_ctor - 247");
+            // 我高度怀疑这个要卡bug
+            c3.Emit(OpCodes.Ldarg, 4);
+            c3.EmitDelegate<Func<int, SlugcatStats.Name, int>>((redCycles, name) =>
+            {
+                if (name.value == "PebblesSlug")
+                {
+                    return Cycles;
+                }
+                return redCycles;
+            });
+        }
+    }
+
 
 
 
 
     // 游戏流程
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private void ProcessManager_CreateValidationLabel(ILContext il)
+
+
+    // 这个东西很可疑，我不太清楚他是干嘛使的。而且下面这个函数也没写完，还要修改redsCycles的数值
+    internal void ProcessManager_CreateValidationLabel(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 25
@@ -320,11 +536,27 @@ class Plugin : BaseUnityPlugin
 
 
     // 香菇病
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // 从雨循环6（还没写倒计时，那时候再测）开始，每隔5个雨循环涨一点休眠饱食度，再加上逐渐恶化的营养不良效果（
+    // 我的建议是前5个雨循环跑完剧情，越到后面越难打（
+
+
+    internal delegate float orig_SlowFadeIn(SaveState self);
+    internal float SaveState_SlowFadeIn(orig_SlowFadeIn orig, SaveState self)
+    {
+        var result = orig(self);
+        if (self.saveStateNumber.value == "PebblesSlug")
+        {
+            result = Mathf.Max(self.malnourished ? 4f : 0.8f, (self.cycleNumber >= RedsIllness.RedsCycles(self.redExtraCycles) && !Custom.rainWorld.ExpeditionMode) ? Custom.LerpMap((float)self.cycleNumber, (float)RedsIllness.RedsCycles(false), (float)(RedsIllness.RedsCycles(false) + 5), 4f, 15f) : 0.8f);
+        }
+        return result;
+    }
+
+
 
     // 从珍珠猫代码里抄的，总之这么写能跑，那就这么写吧（
-    private delegate float orig_RedsIllnessFoodFac(RedsIllness self);
-    private float RedsIllness_FoodFac(orig_RedsIllnessFoodFac orig, RedsIllness self)
+    internal delegate float orig_RedsIllnessFoodFac(RedsIllness self);
+    internal float RedsIllness_FoodFac(orig_RedsIllnessFoodFac orig, RedsIllness self)
     {
         var result = orig(self);
         if (self.player.slugcatStats.name.value == "PebblesSlug")
@@ -335,22 +567,22 @@ class Plugin : BaseUnityPlugin
     }
 
 
-
-    private delegate float orig_RedsIllnessFoodToBeOkay(RedsIllness self);
-    private float RedsIllness_FoodToBeOkay(orig_RedsIllnessFoodToBeOkay orig, RedsIllness self)
+    // 为啥这函数不好使啊 算了 这是特性（你
+    internal delegate float orig_RedsIllnessFoodToBeOkay(RedsIllness self);
+    internal float RedsIllness_FoodToBeOkay(orig_RedsIllnessFoodToBeOkay orig, RedsIllness self)
     {
         var result = orig(self);
         if (self.player.slugcatStats.name.value == "PebblesSlug")
         {
-            result = self.player.slugcatStats.foodToHibernate;
+            result = Math.Min(self.cycle + 1, self.player.slugcatStats.maxFood);
         }
         return result;
     }
 
 
 
-    private delegate float orig_RedsIllnessTimeFactor(RedsIllness self);
-    private float RedsIllness_TimeFactor(orig_RedsIllnessTimeFactor orig, RedsIllness self)
+    internal delegate float orig_RedsIllnessTimeFactor(RedsIllness self);
+    internal float RedsIllness_TimeFactor(orig_RedsIllnessTimeFactor orig, RedsIllness self)
     {
         var result = orig(self);
         if (self.player.slugcatStats.name.value == "PebblesSlug")
@@ -373,29 +605,44 @@ class Plugin : BaseUnityPlugin
 
 
 
+    internal IntVector2 SlugcatStats_SlugcatFoodMeter(On.SlugcatStats.orig_SlugcatFoodMeter orig, SlugcatStats.Name slugcat)
+    {
+        if (slugcat.value == "PebblesSlug")
+        {
+            // SlugcatSelectMenu.saveGameData[slugcat]
+
+            
+            return new IntVector2(MaxFood, MinFood);
+            // 难绷，我这里存的minfoodnow在游戏主界面是会被清零的，除非我有办法把他存到存档里
+        }
+        return orig(slugcat);
+    }
 
 
 
-    private void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
+    internal void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
     {
         orig(self, abstractCreature, world);
-        if (self.slugcatStats.name.value == "PebblesSlug" && !self.playerState.isGhost && world.game.session is StoryGameSession)
+        if (world.game.GetStorySession.characterStats.name.value == "PebblesSlug" && self.slugcatStats.name.value == "PebblesSlug" &&  !self.playerState.isGhost && world.game.session is StoryGameSession )
         {
             int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
-            if (cycle >= 5)
+            if (cycle > 5)
             {
                 // 我敲，后面这个cycle指的是香菇病的cycle而不是游戏流程（汗）
                 self.redsIllness = new RedsIllness(self, cycle - 5);
             }
 
-
-            // 由于今天没有在避难所里狂按q的心情，下面这段代码还没有得到测试，不知道他能不能跑
-            Debug.Log("====++ Player_ctor - cycle:" + cycle);
-            float f = (cycle / Cycles) * (MaxFood - MinFood);
+            // 这下应该没问题了。这可是我精心计算的函数，经验证刚好在6 11 16涨饱食度
+            float f = (float)cycle / Cycles * (MaxFood + 1 - MinFood);
             int result = MinFood + (int)Math.Floor(f);
-            self.slugcatStats.foodToHibernate = (result < MaxFood)? result : MaxFood;
-            self.slugcatStats.maxFood = MaxFood;
-            Debug.Log("====++ Player_ctor - food to hibernate:" + self.slugcatStats.foodToHibernate);
+            MinFoodNow = (result<MaxFood)? result:MaxFood;
+            // 这玩意儿能用吗？byd他只能设置游戏里已有的数据，不能凭空添加
+            // saveData.Set("currentFoodToHibernate", result);
+            if (self.slugcatStats.foodToHibernate < self.slugcatStats.maxFood)
+            {
+                self.slugcatStats.foodToHibernate = (MinFoodNow < MaxFood) ? MinFoodNow : MaxFood;
+                self.slugcatStats.maxFood = MaxFood;
+            }
 
 
         }
@@ -404,8 +651,7 @@ class Plugin : BaseUnityPlugin
     }
 
 
-
-    private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
+    internal void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
     {
         orig(self, eu);
         self.redsIllness?.Update();
@@ -435,11 +681,13 @@ class Plugin : BaseUnityPlugin
 
 
     // 玩家技能
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
 
     // 不能吃神经元。我想这个应该用不着调用原版方法了吧。。
-    private bool Player_CanBeSwallowed(On.Player.orig_CanBeSwallowed orig, Player self, PhysicalObject testObj)
+    internal bool Player_CanBeSwallowed(On.Player.orig_CanBeSwallowed orig, Player self, PhysicalObject testObj)
     {
         if (self.slugcatStats.name.value == "PebblesSlug")
         {
@@ -451,7 +699,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void Player_Jump(On.Player.orig_Jump orig, Player self)
+    internal void Player_Jump(On.Player.orig_Jump orig, Player self)
     {
         orig(self);
         if (self.slugcatStats.name.value == "PebblesSlug")
@@ -463,7 +711,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 一矛超人，只要不使用二段跳，就是常驻2倍矛伤。使用二段跳会导致这个伤害发生衰减，最低不低于0.5。修改slugbase的基础矛伤可以使所有的值发生变化
-    private void Player_ThrownSpear(On.Player.orig_ThrownSpear orig, Player self, Spear spear)
+    internal void Player_ThrownSpear(On.Player.orig_ThrownSpear orig, Player self, Spear spear)
     {
         orig(self, spear);
         if (self.slugcatStats.name.value == "PebblesSlug")
@@ -488,7 +736,7 @@ class Plugin : BaseUnityPlugin
     // 除了特效以外，数值跟炸猫差不多，因为我不知道那堆二段跳的数值怎么改。我想改得小一点，让他没有那么强的机动性，不然太超模了（
     // 因为这个电击在水下是有伤害的（痛击你的队友。jpg）我不是故意的，我是真的写不出来那个判定。我不知道他为什么会闪退。。
     // 我大概应该用原版方法，然后做ilhooking。但是，说真的，想想那个工作量吧（汗）我都不太清楚自己究竟改了些什么
-    private void Player_ClassMechanicsArtificer(On.Player.orig_ClassMechanicsArtificer orig, Player self)
+    internal void Player_ClassMechanicsArtificer(On.Player.orig_ClassMechanicsArtificer orig, Player self)
     {
         // Debug.Log("====++ slugcat name: "+ self.slugcatStats.name.value);
         if (self.slugcatStats.name.value == "PebblesSlug")
@@ -804,7 +1052,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private AbstractPhysicalObject.AbstractObjectType Player_CraftingResults(On.Player.orig_CraftingResults orig, Player self)
+    internal AbstractPhysicalObject.AbstractObjectType Player_CraftingResults(On.Player.orig_CraftingResults orig, Player self)
     {
         if (self.slugcatStats.name.value == "PebblesSlug")
         {
@@ -849,7 +1097,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private bool Player_GraspsCanBeCrafted(On.Player.orig_GraspsCanBeCrafted orig, Player self)
+    internal bool Player_GraspsCanBeCrafted(On.Player.orig_GraspsCanBeCrafted orig, Player self)
     {
 
         if (self.slugcatStats.name.value == "PebblesSlug" && (self.CraftingResults() != null))
@@ -865,7 +1113,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 下面这个暂时没用，但先留着以防我日后突然想给他加点别的能力
-    private void Player_SwallowObject(On.Player.orig_SwallowObject orig, Player self, int grasp)
+    internal void Player_SwallowObject(On.Player.orig_SwallowObject orig, Player self, int grasp)
     {
         if (self.slugcatStats.name.value == "PebblesSlug")
         {
@@ -915,7 +1163,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void Player_SpitUpCraftedObject(ILContext il)
+    internal void Player_SpitUpCraftedObject(ILContext il)
     {
         ILCursor c = new(il);
         // 37 劫持炸矛判定，在此判定电矛。所以有没有人告诉我match到底该怎么写，我不想写这么大一坨，很累的
@@ -937,7 +1185,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void Player_SpitUpCraftedObject_old(On.Player.orig_SpitUpCraftedObject orig, Player self)
+    internal void Player_SpitUpCraftedObject_old(On.Player.orig_SpitUpCraftedObject orig, Player self)
     {
         if (self.slugcatStats.name.value == "PebblesSlug")
         {
@@ -1031,7 +1279,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 啊！！终于把原来那一坨复制粘贴删了！！感觉像新年的第一天穿上新内裤一样清爽啊！！
-    private void Player_GrabUpdate(ILContext il)
+    internal void Player_GrabUpdate(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 337末尾，修改神经元的可食用性。没错，我要借用一下他自带的那个brfalse。。因为我自己不会写！！
@@ -1104,7 +1352,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 被电不仅不会死，还会吃饱（？
-    private void ZapCoil_Update(ILContext il)
+    internal void ZapCoil_Update(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 182，还是那个劫持判定
@@ -1146,7 +1394,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 同理，现在可以免疫蜈蚣的电击，甚至吃上一顿
-    private void Centipede_Shock(ILContext il)
+    internal void Centipede_Shock(ILContext il)
     {
          ILCursor c = new ILCursor(il);
         // 226，还是那个劫持判定，修改蜈蚣的体重让他无论如何都会小于玩家体重
@@ -1185,7 +1433,7 @@ class Plugin : BaseUnityPlugin
     // 不能免疫蜈蚣的电击，但我认为这不是我的问题，是蜈蚣的问题。
     // 错了，好像是我的问题，这个violence怎么说
     // 没事了，确实是蜈蚣的问题，大蜈蚣电击致死是硬编码的
-    private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
+    internal void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
     {
         if (self is Player && (self as Player).slugcatStats.name.value == "PebblesSlug")
         {

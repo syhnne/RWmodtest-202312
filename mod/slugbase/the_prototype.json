@@ -32,15 +32,14 @@
 		"tunnel_speed": 1.5,
 		"throw_skill": [ 1.0, 0.7 ],
 		"crouch_stealth": [ 1.0, 0.6 ],
-		"food_min": 5,
-		"food_max": 8,
 
-		"karma": 9,
+
+
+		"karma": 0,
 		"karma_cap": 9,
 		"the_mark": true,
 		"the_glow": true,
-		"cycle_length_min": 6.5,
-		"cycle_length_max": 8.5,
+		"cycle_length_min": 9,
 
 		"guide_overseer": 1,
 		"start_room": "CC_A02",

@@ -38,8 +38,8 @@ public class PebblesSlugOption : OptionInterface
                 this._ExplosionCapacity
             });
     }
-    private readonly int DefaultExplosionCapacity = 10;
-    private OpSlider _ExplosionCapacity;
+    internal readonly int DefaultExplosionCapacity = 10;
+    internal OpSlider _ExplosionCapacity;
     public static Configurable<int> ExplosionCapacity;
 
 }
