@@ -44,9 +44,14 @@ internal class CustomLore
         IL.SaveState.LoadGame += SaveState_LoadGame;
 
         On.RainWorldGame.GoToRedsGameOver += RainWorldGame_GoToRedsGameOver;
-        
-        
+
+        On.RainWorldGame.BeatGameMode += RainWorldGame_BeatGameMode;
+
+
+
     }
+
+
 
 
 
@@ -150,15 +155,15 @@ internal class CustomLore
     private static void RainWorldGame_Win(On.RainWorldGame.orig_Win orig, RainWorldGame self, bool malnourished)
     {
         if (self.manager.upcomingProcess != null) return;
-        
-        StoryGameSession story = self.GetStorySession;
-        if (story.saveStateNumber.value == Plugin.SlugcatName)
+       
+        SaveState save = self.GetStorySession.saveState;
+        if (self.GetStorySession.saveStateNumber.value == Plugin.SlugcatName)
         {
-            Debug.Log("====++ RainWorldGame_Win: cycle: " + story.saveState.cycleNumber);
-            if (story.saveState.cycleNumber >= Plugin.Cycles)
+            Debug.Log("====++ RainWorldGame_Win: cycle: " + save.cycleNumber);
+            if (!save.deathPersistentSaveData.altEnding && save.cycleNumber >= Plugin.Cycles)
             {
-                Debug.Log("====++ PebblesSlug Game Over !!! ++==== cycle:"+ story.saveState.cycleNumber);
-                self.GetStorySession.saveState.deathPersistentSaveData.redsDeath = true;
+                Debug.Log("====++ PebblesSlug Game Over !!! ++==== cycle:"+ save.cycleNumber);
+                save.deathPersistentSaveData.redsDeath = true;
                 self.GoToRedsGameOver();
                 return;
             }
@@ -277,10 +282,8 @@ internal class CustomLore
             if (standardVoidSea)
             {
                 string str = "====++ Beat Game Mode(void sea ending) : ";
-                SaveState saveState = game.GetStorySession.saveState;
-                Debug.Log(str + ((saveState != null) ? saveState.ToString() : null));
+                Debug.Log(str + (game.GetStorySession.saveState?.ToString()));
                 game.GetStorySession.saveState.deathPersistentSaveData.ascended = true;
-                game.GetStorySession.saveState.deathPersistentSaveData.altEnding = true;
                 // game.rainWorld.progression.miscProgressionData.beaten_（） = true;
                 if (ModManager.CoopAvailable)
                 {
@@ -305,11 +308,14 @@ internal class CustomLore
             }
 
             string roomName = "SS_AI";
-            // game.GetStorySession.saveState.deathPersistentSaveData.altEnding = true;
-            // game.GetStorySession.saveState.deathPersistentSaveData.ascended = false;
+            game.GetStorySession.saveState.deathPersistentSaveData.altEnding = true;
+            game.GetStorySession.saveState.deathPersistentSaveData.ascended = false;
             // game.rainWorld.progression.miscProgressionData.beaten_（） = true;
-            game.GetStorySession.saveState.deathPersistentSaveData.karma = game.GetStorySession.saveState.deathPersistentSaveData.karmaCap;
-
+            // game.GetStorySession.saveState.deathPersistentSaveData.karma = game.GetStorySession.saveState.deathPersistentSaveData.karmaCap;
+            game.GetStorySession.saveState.BringUpToDate(game);
+            AbstractCreature abstractCreature = game.FirstAlivePlayer;
+            abstractCreature ??= game.FirstAnyPlayer;
+            game.GetStorySession.saveState.AppendCycleToStatistics(abstractCreature.realizedCreature as Player, game.GetStorySession, false, 0);
             RainWorldGame.ForceSaveNewDenLocation(game, roomName, false);
 
         }

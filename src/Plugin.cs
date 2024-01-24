@@ -263,7 +263,6 @@ class Plugin : BaseUnityPlugin
         orig(self, sLeaser, rCam, timeStacker, camPos);
         if (self.player.slugcatStats.name.value == SlugcatName)
         {
-            // 我知道了，问题大概在这里，我只给尾巴重新改了材质，剩下的材质都是加载了但是没用上。
             // 理论上这个代码能简化一下，但我要先让它跑起来，剩下的我不敢动
             for (int i = 0; i < sLeaser.sprites.Length; i++)
             {
@@ -273,7 +272,6 @@ class Plugin : BaseUnityPlugin
                 }
                 else
                 {
-                    if (i==3) Debug.Log("====++ GRAPHICS - element 3:" + sLeaser.sprites[i].element.name);
                     if (sLeaser.sprites[i].element.name.StartsWith(sLeaser.sprites[i].element.name))
                     {
                         if (Futile.atlasManager.DoesContainElementWithName("fp_" + sLeaser.sprites[i].element.name))
@@ -439,7 +437,7 @@ class Plugin : BaseUnityPlugin
         {
             int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
             bool altEnding = (world.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding;
-            if (cycle > 5)
+            if (cycle > 5 && !altEnding)
             {
                 self.redsIllness = new RedsIllness(self, cycle - 5);
             }
