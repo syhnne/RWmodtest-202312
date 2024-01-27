@@ -16,6 +16,7 @@ using Mono.Cecil.Cil;
 using MonoMod.Cil;
 
 
+
 using Menu.Remix.MixedUI;
 using System.ComponentModel;
 using System.Linq;
@@ -25,7 +26,9 @@ using SlugBase.DataTypes;
 using MonoMod.RuntimeDetour;
 using System.Reflection;
 using SlugBase.SaveData;
-
+using static PebblesSlug.PlayerHooks;
+using System.Runtime.InteropServices;
+using static MonoMod.InlineRT.MonoModRule;
 
 
 
@@ -49,16 +52,13 @@ class Plugin : BaseUnityPlugin
 
     // 不要给猫改名！！！不要给猫改名！！！不要给猫改名！！！
 
-    internal static readonly Color32 bodyColor_hard = new Color32(254, 104, 202, 255);
-    internal static readonly Color eyesColor_hard = new Color(1f, 1f, 1f);
 
-    public static readonly PlayerFeature<Color> BodyColor = PlayerColor("Body");
-    public static readonly PlayerFeature<Color> EyesColor = PlayerColor("Eyes");
 
     public static new ManualLogSource Logger { get; internal set; }
 
     public PebblesSlugOption option;
-    internal bool AddFoodByShock = false;
+
+
     internal bool IsInit;
     internal static readonly List<int> ColoredBodyParts = new List<int>() { 2, 3, 5, 6, 7, 8, 9, };
 
@@ -67,8 +67,16 @@ class Plugin : BaseUnityPlugin
     internal static readonly int MaxFood = 8;
     internal static readonly int MinFood = 5;
     internal int MinFoodNow = 5;
+
+    internal static readonly Color32 bodyColor_hard = new Color32(254, 104, 202, 255);
+    internal static readonly Color eyesColor_hard = new Color(1f, 1f, 1f);
+
     internal static readonly string SlugcatName = "PebblesSlug";
     internal static readonly SlugcatStats.Name SlugcatStatsName = new SlugcatStats.Name(SlugcatName);
+    internal static readonly Oracle.OracleID oracleID = new Oracle.OracleID("PL");
+    internal static readonly bool ShowLogs = true;
+    internal static Plugin instance;
+    
 
 
     /*
@@ -93,17 +101,17 @@ class Plugin : BaseUnityPlugin
 
 
 
-
-
     // 加入钩子
     public void OnEnable()
     {
 
         try
         {
-            this.option = new PebblesSlugOption();
+            option = new PebblesSlugOption();
+            instance = this;
 
             CustomLore.Apply();
+            SSOracleHooks.Apply();
 
 
             On.RainWorld.OnModsInit += Extras.WrapInit(LoadResources);
@@ -122,6 +130,8 @@ class Plugin : BaseUnityPlugin
             On.Player.ctor += Player_ctor;
             
             On.Player.Update += Player_Update;
+            On.Player.NewRoom += Player_NewRoom;
+            On.Player.Die += Player_Die;
 
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
             IL.ZapCoil.Update += ZapCoil_Update;
@@ -186,6 +196,7 @@ class Plugin : BaseUnityPlugin
         try
         {
             MachineConnector.SetRegisteredOI("PebblesSlug_by_syhnne", this.option);
+            
             bool isInit = this.IsInit;
             if (!isInit)
             {
@@ -202,9 +213,19 @@ class Plugin : BaseUnityPlugin
         }
     }
 
+    public static void Log(params string[] text)
+    {
+        if (ShowLogs)
+        {
+            string log = "";
+            foreach (string s in text) { log += s; }
+            Debug.Log("[PebblesSlug] " + log);
+        }
+            
+    }
 
 
-    // 图形
+    #region 图形
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // 因为根本不会C#所以把图形和技能全写一起了
 
@@ -312,17 +333,7 @@ class Plugin : BaseUnityPlugin
     }
 
 
-
-
-
-
-
-
-    
-
-
-
-    
+    #endregion
 
 
 
@@ -339,7 +350,17 @@ class Plugin : BaseUnityPlugin
 
 
 
-    // 香菇病，雨循环倒计时，饱食度
+
+
+
+
+
+
+
+
+
+
+    #region 香菇病，雨循环倒计时，饱食度
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // 从雨循环15开始，每隔5个雨循环涨一点休眠饱食度，再加上逐渐恶化的营养不良效果（
     // 我的建议是前7个雨循环内跑完剧情，亲测挂上了香菇病之后得至少两只秃鹫才能雨眠，而且最高矛伤会掉到1.2
@@ -381,22 +402,24 @@ class Plugin : BaseUnityPlugin
         var result = orig(self);
         if (self.player.slugcatStats.name.value == SlugcatName)
         {
-            result = Mathf.Max(0.25f, 1f / ((float)self.cycle * 0.25f + 1f));
+            result = Mathf.Max(0.25f, 1f / (Mathf.Ceil(self.cycle * 0.25f) + 1f));
+            Log("RedsIllness_FoodFac" + result.ToString());
         }
         return result;
     }
 
 
 
-
-    internal delegate float orig_RedsIllnessFoodToBeOkay(RedsIllness self);
-    internal float RedsIllness_FoodToBeOkay(orig_RedsIllnessFoodToBeOkay orig, RedsIllness self)
+    // 这个好像不好使
+    internal delegate int orig_RedsIllnessFoodToBeOkay(RedsIllness self);
+    internal int RedsIllness_FoodToBeOkay(orig_RedsIllnessFoodToBeOkay orig, RedsIllness self)
     {
-        Debug.Log("====++ RedsIllness_FoodToBeOkay");
+        
         var result = orig(self);
         if (self.player.slugcatStats.name.value == SlugcatName)
         {
             result = self.player.slugcatStats.foodToHibernate;
+            Log("RedsIllness_FoodToBeOkay" + result.ToString());
         }
         return result;
     }
@@ -419,55 +442,6 @@ class Plugin : BaseUnityPlugin
 
 
 
-    // 实际修改饱食度的函数
-    internal IntVector2 SlugcatStats_SlugcatFoodMeter(On.SlugcatStats.orig_SlugcatFoodMeter orig, SlugcatStats.Name slugcat)
-    {
-        return (slugcat.value == SlugcatName) ? new IntVector2(MaxFood, MinFoodNow) : orig(slugcat);
-    }
-
-
-
-
-
-    // 随着游戏进度修改游戏内饱食度，不出意外的话，打真结局后就不会再改了
-    internal void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
-    {
-        orig(self, abstractCreature, world);
-        if (world.game.session is StoryGameSession && world.game.GetStorySession.characterStats.name.value == SlugcatName && self.slugcatStats.name.value == SlugcatName &&  !self.playerState.isGhost)
-        {
-            int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
-            bool altEnding = (world.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding;
-            if (cycle > 5 && !altEnding)
-            {
-                self.redsIllness = new RedsIllness(self, cycle - 5);
-            }
-
-            // 这下应该没问题了。这可是我精心计算的函数，经验证刚好在6 11 16涨饱食度
-            int result = MinFood + (int)Math.Floor((float)cycle / Cycles * (MaxFood + 1 - MinFood));
-            if (!altEnding) MinFoodNow = (result < MaxFood) ? result : MaxFood;
-
-            // 以防挨饿之后他覆盖挨饿的饱食度
-            if (self.slugcatStats.foodToHibernate < self.slugcatStats.maxFood)
-            {
-                self.slugcatStats.foodToHibernate = (MinFoodNow < MaxFood) ? MinFoodNow : MaxFood;
-                self.slugcatStats.maxFood = MaxFood;
-            }
-
-
-        }
-
-        
-    }
-
-
-
-
-    // Update
-    internal void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
-    {
-        orig(self, eu);
-        self.redsIllness?.Update();
-    }
 
 
 
@@ -544,10 +518,13 @@ class Plugin : BaseUnityPlugin
 
 
 
+
+
+
     // 修改游戏内显示的雨循环倒计时
     internal void HUD_SubregionTracker_Update(ILContext il)
     {
-        Debug.Log("====++ HUD_SubregionTracker_Update");
+        Log("HUD_SubregionTracker_Update");
         ILCursor c = new ILCursor(il);
         // 164 修改是否是红猫的判定
         if (c.TryGotoNext(MoveType.After,
@@ -561,7 +538,7 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Debug.Log("====++ Match successfully! - HUD_SubregionTracker_Update - 164");
+            Log("Match successfully! - HUD_SubregionTracker_Update - 164");
             c.Emit(OpCodes.Ldloc_0);
             c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
             {
@@ -598,7 +575,6 @@ class Plugin : BaseUnityPlugin
     // 不知道这个是干嘛的，但既然搜索搜出来了就改一下罢
     internal void HUD_Map_CycleLabel_UpdateCycleText(ILContext il)
     {
-        Debug.Log("====++ HUD_Map_CycleLabel_UpdateCycleText");
         ILCursor c = new ILCursor(il);
         // 23 修改判定
         if (c.TryGotoNext(MoveType.After,
@@ -610,7 +586,6 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Debug.Log("====++ Match successfully! - HUD_Map_CycleLabel_UpdateCycleText - 23");
             c.Emit(OpCodes.Ldloc_0); //Player
             c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
             {
@@ -629,7 +604,6 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Debug.Log("====++ Match successfully! - HUD_Map_CycleLabel_UpdateCycleText - 32");
             c2.Emit(OpCodes.Ldloc_0); //Player
             c2.EmitDelegate<Func<int, Player, int>>((redsCycles, player) =>
             {
@@ -659,7 +633,6 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Debug.Log("====++ Match successfully! - ProcessManager_CreateValidationLabel - 25");
             c.Emit(OpCodes.Ldloc_1);
             c.EmitDelegate<Func<bool, SlugcatStats.Name, bool>>((isRed, name) =>
             {
@@ -678,13 +651,92 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Debug.Log("====++ Match successfully! - ProcessManager_CreateValidationLabel - 32");
             c2.Emit(OpCodes.Ldloc_1);
             c2.EmitDelegate<Func<int, SlugcatStats.Name, int>>((redsCycles, name) =>
             {
                 return name.value == SlugcatName ? Cycles : redsCycles;
             });
         }
+    }
+
+
+
+    #endregion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // 实际修改饱食度的函数
+    internal IntVector2 SlugcatStats_SlugcatFoodMeter(On.SlugcatStats.orig_SlugcatFoodMeter orig, SlugcatStats.Name slugcat)
+    {
+        Log("FoodMeter: ",MaxFood.ToString(), MinFoodNow.ToString());
+        return (slugcat.value == SlugcatName) ? new IntVector2(MaxFood, MinFoodNow) : orig(slugcat);
+    }
+
+
+
+
+
+    // 随着游戏进度修改游戏内饱食度，不出意外的话，打真结局后就不会再改了
+    internal void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
+    {
+        orig(self, abstractCreature, world);
+        if (world.game.session is StoryGameSession && world.game.GetStorySession.characterStats.name.value == SlugcatName && self.slugcatStats.name.value == SlugcatName &&  !self.playerState.isGhost)
+        {
+            modules.Add(self, new PlayerModule(self));
+
+            int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
+            bool altEnding = (world.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding;
+            Log(cycle.ToString(),"<=cycle  altEnding=>", altEnding.ToString());
+            if (cycle > 5 && !altEnding)
+            {
+                self.redsIllness = new RedsIllness(self, cycle - 5);
+            }
+
+            // 这下应该没问题了。这可是我精心计算的函数，经验证刚好在6 11 16涨饱食度
+            int result = MinFood + (int)Math.Floor((float)cycle / Cycles * (MaxFood + 1 - MinFood));
+            if (!altEnding) MinFoodNow = (result < MaxFood) ? result : MaxFood;
+
+            // 以防挨饿之后他覆盖挨饿的饱食度
+            if (self.slugcatStats.foodToHibernate != self.slugcatStats.maxFood)
+            {
+                self.slugcatStats.foodToHibernate = (MinFoodNow < MaxFood) ? MinFoodNow : MaxFood;
+                self.slugcatStats.maxFood = MaxFood;
+            }
+
+
+        }
+
+        
     }
 
 
@@ -705,9 +757,133 @@ class Plugin : BaseUnityPlugin
 
 
 
-    // 玩家技能
+
+    
+    // 各种update
+    // 小心蛞蝓猫钻管道的时候self.room会变成null。。
+    internal void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
+    {
+        orig(self, eu);
+        self.redsIllness?.Update();
+
+        bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+
+        if (getModule)  module.Update(self, eu);
+
+        if (getModule && self.slugcatStats.name == SlugcatStatsName && self.room != null && self.room.game.session is StoryGameSession && (self.room.game.session as StoryGameSession).saveStateNumber == SlugcatStatsName)
+        {
+            PlayerGravityControl(self, module);
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #region ~玩家技能~
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+
+    // 重力控制：单独绑了个按键。这个功能刚玩会觉得很鸡肋，但我试了试，低重力让我能够飞行当中一矛命中蜥蜴身体，当场开饭。高重力让我随手召唤秃鹫，单矛随便杀。
+    // 我开始理解fp为什么会说自己是神了。
+    // 以后还是把他改成，解锁结局后才能全局操控重力吧。现在我先不改，太好玩了，我先玩
+    internal void PlayerGravityControl(Player self, PlayerModule module)
+    {
+        if (self.Consious && !self.dead && self.stun == 0
+            && self.input[0].y != 0 && Input.GetKey(instance.option.GravityControlKey.Value)
+            && self.bodyMode != Player.BodyModeIndex.CorridorClimb && self.animation != Player.AnimationIndex.HangFromBeam && self.animation != Player.AnimationIndex.ClimbOnBeam && self.bodyMode != Player.BodyModeIndex.WallClimb && self.animation != Player.AnimationIndex.AntlerClimb && self.animation != Player.AnimationIndex.VineGrab && self.animation != Player.AnimationIndex.ZeroGPoleGrab && self.onBack == null
+            )
+        {
+            module.gravityControlCounter++;
+            if (module.gravityControlCounter >= module.gravityControlTime)
+            {
+                module.gravityBonus += self.input[0].y;
+                if (module.gravityBonus >= 0)
+                {
+
+                    if (self.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || self.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
+                    {
+                        Log("HAS GRAVITY EFFECT");
+                        // 如果有类似效果，由于我猜这两效果不能大于1，所以还得钳制范围
+                        if (module.gravityBonus <= 10)
+                        {
+                            self.room.gravity = 0.1f * module.gravityBonus;
+                            // 找到并修改zeroG这个效果。roomeffects竟然没有一个能让我直接找到对应效果的函数，还得我自己写for循环……
+                            for (int i = 0; i < self.room.roomSettings.effects.Count; i++)
+                            {
+                                if (self.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG || self.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG)
+                                {
+                                    self.room.roomSettings.effects[i].amount = 0.1f * (10 - module.gravityBonus);
+                                    Log("zeroG amount: ", self.room.roomSettings.effects[i].amount.ToString());
+                                }
+                            }
+                        }
+                        else { module.gravityBonus = 10; }
+                    }
+
+                    else
+                    {
+                        self.room.gravity = 0.1f * module.gravityBonus;
+                    }
+
+                }
+                else { module.gravityBonus = 0; }
+
+                Log("player gravity control RESULT" + self.room.gravity);
+                module.gravityControlCounter = 0;
+            }
+        }
+    }
+
+
+
+    // 防止你那倒霉的联机队友在你死了之后顶着3倍重力艰难行走
+    internal void Player_Die(On.Player.orig_Die orig, Player self)
+    {
+        orig(self);
+        bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+        if (getModule && self.slugcatStats.name == SlugcatStatsName)
+        {
+            module.gravityBonus = 10;
+            self.room.gravity = 1f;
+            Log("gravity set to 1.0 because player died");
+        }
+    }
+
+
+
+    // 房间发生变化时保留重力变化
+    internal void Player_NewRoom(On.Player.orig_NewRoom orig, Player self, Room newRoom)
+    {
+        orig(self, newRoom);
+        bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+        if (getModule && self.slugcatStats.name == SlugcatStatsName)
+        {
+            if (self.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || self.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
+            {
+                Log("gravityBonus cleared because room has ZeroG effect");
+                module.gravityBonus = (int)Mathf.Round(10f * self.room.gravity);
+            }
+            else
+            {
+                self.room.gravity = module.gravityBonus * 0.1f;
+            }
+                
+        }
+    }
 
 
 
@@ -747,7 +923,7 @@ class Plugin : BaseUnityPlugin
                 spearDmgBonus /= self.pyroJumpCounter;
             }
             spear.spearDamageBonus *= (0.5f + spearDmgBonus);
-            Debug.Log("====++ spearDmgBonus: " + (0.5f+spearDmgBonus) + "  result: " + spear.spearDamageBonus);
+            Log("spearDmgBonus: " + (0.5f+spearDmgBonus) + "  result: " + spear.spearDamageBonus);
         }
         
     }
@@ -763,7 +939,7 @@ class Plugin : BaseUnityPlugin
     // 我大概应该用原版方法，然后做ilhooking。但是，说真的，想想那个工作量吧（汗）我都不太清楚自己究竟改了些什么
     internal void Player_ClassMechanicsArtificer(On.Player.orig_ClassMechanicsArtificer orig, Player self)
     {
-        // Debug.Log("====++ slugcat name: "+ self.slugcatStats.name.value);
+        // Log("slugcat name: "+ self.slugcatStats.name.value);
         if (self.slugcatStats.name.value == SlugcatName)
         {
             Room room = self.room;
@@ -1200,7 +1376,7 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Ldfld)
             ))
         {
-            Debug.Log("====++ Match successfully! - Player_SpitUpCraftedObject");
+            Log("Match successfully! - Player_SpitUpCraftedObject");
         }
     }
 
@@ -1392,15 +1568,14 @@ class Plugin : BaseUnityPlugin
         {
             c.EmitDelegate<Func<PhysicalObject, PhysicalObject>>((physicalObj) =>
             {
-                Debug.Log("====++ Match successfully! - ZapCoil");
                 if (physicalObj is Player && (physicalObj as Player).slugcatStats.name.value == SlugcatName)
                 {
                     (physicalObj as Player).Stun(200);
-                    if (AddFoodByShock)
+                    if (PebblesSlugOption.AddFoodOnShock.Value)
                     {
                         int maxfood = (physicalObj as Player).MaxFoodInStomach;
                         int food = (physicalObj as Player).FoodInStomach;
-                        Debug.Log("====++ food:" + food + " maxfood: " + maxfood);
+                        Log("food:" + food + " maxfood: " + maxfood);
                         (physicalObj as Player).AddFood(maxfood - food);
                     }
                     return null;
@@ -1429,14 +1604,14 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Debug.Log("====++ Match successfully! - CentipedeShock");
+            Log("Match successfully! - CentipedeShock");
             c.Emit(OpCodes.Ldarg_1);
             c.EmitDelegate<Func<float, PhysicalObject, float>>((centipedeMass, physicalObj) =>
             {
-                Debug.Log("====++ Match successfully! - CentipedeShock, centipede mass: "+ centipedeMass);
+                Log("Match successfully! - CentipedeShock, centipede mass: "+ centipedeMass);
                 if (physicalObj is Player && (physicalObj as Player).slugcatStats.name.value == SlugcatName) 
                 {
-                    if (AddFoodByShock && (physicalObj as Player).FoodInStomach < (physicalObj as Player).MaxFoodInStomach)
+                    if (PebblesSlugOption.AddFoodOnShock.Value && (physicalObj as Player).FoodInStomach < (physicalObj as Player).MaxFoodInStomach)
                     {
                         (physicalObj as Player).AddFood(1);
                     }
@@ -1468,6 +1643,14 @@ class Plugin : BaseUnityPlugin
         }
         orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
     }
+    #endregion
+
+
+
+
+
+
+
 
 }
 
