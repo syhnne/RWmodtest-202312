@@ -71,10 +71,9 @@ internal class PlayerHooks
         internal Oracle oracle;
         internal OracleGraphics oracleGraphics;
         internal bool movementInputOnly = false;
+        
+        internal Plugin.GravityController gravityController;
 
-        internal int gravityControlCounter = 0;
-        internal int gravityBonus = 10;
-        internal int gravityControlTime = 12; //这纯属为了修改方便，就权当他是静态的罢（
 
         public PlayerModule(Player player)
         {
@@ -87,9 +86,15 @@ internal class PlayerHooks
             else { storyName = null; }
             isPebbles = playerName == Plugin.SlugcatStatsName && storyName == Plugin.SlugcatStatsName;
 
+
+            if (playerName == Plugin.SlugcatStatsName && storyName != null)
+            {
+                gravityController = new Plugin.GravityController(player);
+            }
             if (isPebbles)
             {
                 Plugin.Log("playermodule!");
+                
                 // oracle = new Oracle(new AbstractPhysicalObject(player.room.world, AbstractPhysicalObject.AbstractObjectType.Oracle, null, new WorldCoordinate(player.room.abstractRoom.index, 15, 15, -1), player.room.game.GetNewID()), player.room);
                 // player.room.AddObject(oracle);
                 // oracleGraphics = new OracleGraphics(player);

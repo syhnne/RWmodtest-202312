@@ -237,15 +237,13 @@ internal class CustomLore
                 if (ModManager.CoopAvailable)
                 {
                     int num = 0;
-                    using (IEnumerator<Player> enumerator = (from x in self.session.game.Players
-                                                             select x.realizedCreature as Player).GetEnumerator())
+                    using IEnumerator<Player> enumerator = (from x in self.session.game.Players
+                                                            select x.realizedCreature as Player).GetEnumerator();
+                    while (enumerator.MoveNext())
                     {
-                        while (enumerator.MoveNext())
-                        {
-                            Player player = enumerator.Current;
-                            self.GetStorySession.saveState.AppendCycleToStatistics(player, self.GetStorySession, true, num);
-                            num++;
-                        }
+                        Player player = enumerator.Current;
+                        self.GetStorySession.saveState.AppendCycleToStatistics(player, self.GetStorySession, true, num);
+                        num++;
                     }
                 }
                 else self.GetStorySession.saveState.AppendCycleToStatistics(self.Players[0].realizedCreature as Player, self.GetStorySession, true, 0);
