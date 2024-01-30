@@ -15,18 +15,17 @@ public class PebblesSlugOption : OptionInterface
     internal readonly int DefaultExplosionCapacity = 10;
     public static Configurable<int> ExplosionCapacity;
     public static Configurable<bool> AddFoodOnShock;
-    public static Configurable<bool> GravityControlOutside;
+    /*public static Configurable<bool> GravityControlOutside;*/
     public Configurable<KeyCode> GravityControlKey;
 
-    UIelement[] settings;
 
     public PebblesSlugOption()
     {
         ExplosionCapacity = config.Bind<int>("ExplosionCapacity", 10);
         AddFoodOnShock = config.Bind<bool>("AddFoodOnShock", false);
         GravityControlKey = config.Bind<KeyCode>("GravityControlKey", KeyCode.G);
-        // 底下这个还没绑定。以后可能不会这么写
-        GravityControlOutside = config.Bind<bool>("GravityControlOutside", false);
+        /*// 这个还是拿剧情卡一下吧。回头再改，等我玩腻了再说（
+        GravityControlOutside = config.Bind<bool>("GravityControlOutside", false);*/
     }
 
 
@@ -76,13 +75,13 @@ public class PebblesSlugOption : OptionInterface
             { description = desc }
         );
 
-        desc = "(WIP)Enable this to control gravity in any room";
+/*        desc = "(WIP)Enable this to control gravity in any room";
         Tabs[0].AddItems(
             new OpLabel(xposLabel, ymax - yspacing - 150f, inGameTranslator.Translate("Gravity control for all rooms"), false)
             { description = desc },
             new OpCheckBox(GravityControlOutside, xposOpt, ymax - yspacing - 150f)
             { description = desc }
-        );
+        );*/
 
 
 

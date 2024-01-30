@@ -41,6 +41,7 @@ internal class CustomLore
         // On.Menu.SlugcatSelectMenu.ctor += Menu_SlugcatSelectMenu_ctor;
         // On.Menu.SlugcatSelectMenu.MineForSaveData += Menu_SlugcatSelectMenu_MineForSaveData;
 
+        On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.Update += MSCRoomSpecificScript_GourmandEnding_Update;
         IL.SaveState.LoadGame += SaveState_LoadGame;
 
         On.RainWorldGame.GoToRedsGameOver += RainWorldGame_GoToRedsGameOver;
@@ -330,8 +331,25 @@ internal class CustomLore
 
 
 
-
-
+    // 防止玩家用特殊手段归乡（别想在酒吧点炒饭
+    private static void MSCRoomSpecificScript_GourmandEnding_Update(On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.orig_Update orig, MSCRoomSpecificScript.OE_GourmandEnding self, bool eu)
+    {
+        if (!ModManager.CoopAvailable)
+        {
+            if (self.room.game.Players.Count > 0 && self.room.game.Players[0].realizedCreature != null && self.room.game.Players[0].realizedCreature.room == self.room && (self.room.game.Players[0].realizedCreature as Player).slugcatStats.name == Plugin.SlugcatStatsName)
+            {
+                return;
+            }
+        }
+        else
+        {
+            if (self.room.PlayersInRoom.Count > 0 && self.room.PlayersInRoom[0] != null && self.room.PlayersInRoom[0].room == self.room && self.room.PlayersInRoom[0].slugcatStats.name == Plugin.SlugcatStatsName)
+            {
+                return;
+            }
+        }
+        orig(self, eu);
+    }
 
 
 
@@ -346,6 +364,7 @@ internal class CustomLore
     private static void Room_Loaded(On.Room.orig_Loaded orig, Room self)
     {
         orig(self);
+        Plugin.Log("Room_Loaded: ", self.abstractRoom.name);
     }
 
 

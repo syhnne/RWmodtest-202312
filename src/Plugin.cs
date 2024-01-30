@@ -29,6 +29,7 @@ using SlugBase.SaveData;
 using static PebblesSlug.PlayerHooks;
 using System.Runtime.InteropServices;
 using static MonoMod.InlineRT.MonoModRule;
+using System.Runtime.CompilerServices;
 
 
 
@@ -47,6 +48,7 @@ namespace PebblesSlug;
 class Plugin : BaseUnityPlugin
 {
     internal const string MOD_ID = "PebblesSlug_by_syhnne";
+    public static ConditionalWeakTable<Player, PlayerModule> playerModules = new ConditionalWeakTable<Player, PlayerModule>();
 
 
 
@@ -76,7 +78,9 @@ class Plugin : BaseUnityPlugin
     internal static readonly Oracle.OracleID oracleID = new Oracle.OracleID("PL");
     internal static readonly bool ShowLogs = true;
     internal static Plugin instance;
-    
+    // 以防我测试的时候不能使用这个功能，发布的时候就改成false
+    public static bool GravityControlUnlock = true;
+
 
 
     /*
@@ -112,6 +116,7 @@ class Plugin : BaseUnityPlugin
 
             CustomLore.Apply();
             SSOracleHooks.Apply();
+            PlayerHooks.Apply();
 
 
             On.RainWorld.OnModsInit += Extras.WrapInit(LoadResources);
@@ -133,6 +138,8 @@ class Plugin : BaseUnityPlugin
             On.Player.NewRoom += Player_NewRoom;
             On.Player.Die += Player_Die;
             On.Player.Destroy += Player_Destroy;
+            // On.RoomPreparer.Update += RoomPreparer_Update;
+            // On.RoomRealizer.Update += RoomRealizer_Update;
 
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
             IL.ZapCoil.Update += ZapCoil_Update;
@@ -148,7 +155,6 @@ class Plugin : BaseUnityPlugin
 
 
 
-            // 急 下面这俩貌似是根本没挂上 他妈的怎么回事 这三个都挂不上我操
             IL.HUD.Map.CycleLabel.UpdateCycleText += HUD_Map_CycleLabel_UpdateCycleText;
             IL.HUD.SubregionTracker.Update += HUD_SubregionTracker_Update;
             // IL.ProcessManager.CreateValidationLabel += ProcessManager_CreateValidationLabel;
@@ -192,7 +198,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal void LoadResources(RainWorld rainWorld)
+    private void LoadResources(RainWorld rainWorld)
     {
         try
         {
@@ -385,8 +391,8 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal delegate float orig_SlowFadeIn(SaveState self);
-    internal float SaveState_SlowFadeIn(orig_SlowFadeIn orig, SaveState self)
+    private delegate float orig_SlowFadeIn(SaveState self);
+    private float SaveState_SlowFadeIn(orig_SlowFadeIn orig, SaveState self)
     {
         var result = orig(self);
         if (self.saveStateNumber.value == SlugcatName)
@@ -400,8 +406,8 @@ class Plugin : BaseUnityPlugin
 
 
     // 从珍珠猫代码里抄的，总之这么写能跑，那就这么写吧（
-    internal delegate float orig_RedsIllnessFoodFac(RedsIllness self);
-    internal float RedsIllness_FoodFac(orig_RedsIllnessFoodFac orig, RedsIllness self)
+    private delegate float orig_RedsIllnessFoodFac(RedsIllness self);
+    private float RedsIllness_FoodFac(orig_RedsIllnessFoodFac orig, RedsIllness self)
     {
         var result = orig(self);
         if (self.player.slugcatStats.name.value == SlugcatName)
@@ -415,8 +421,8 @@ class Plugin : BaseUnityPlugin
 
 
     // 这个好像不好使
-    internal delegate int orig_RedsIllnessFoodToBeOkay(RedsIllness self);
-    internal int RedsIllness_FoodToBeOkay(orig_RedsIllnessFoodToBeOkay orig, RedsIllness self)
+    private delegate int orig_RedsIllnessFoodToBeOkay(RedsIllness self);
+    private int RedsIllness_FoodToBeOkay(orig_RedsIllnessFoodToBeOkay orig, RedsIllness self)
     {
         
         var result = orig(self);
@@ -431,8 +437,8 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal delegate float orig_RedsIllnessTimeFactor(RedsIllness self);
-    internal float RedsIllness_TimeFactor(orig_RedsIllnessTimeFactor orig, RedsIllness self)
+    private delegate float orig_RedsIllnessTimeFactor(RedsIllness self);
+    private float RedsIllness_TimeFactor(orig_RedsIllnessTimeFactor orig, RedsIllness self)
     {
         var result = orig(self);
         if (self.player.slugcatStats.name.value == SlugcatName)
@@ -451,7 +457,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 修改游戏界面显示的雨循环倒计时以及饱食度
-    internal void Menu_SlugcatSelectMenu_SlugcatPageContinue_ctor(ILContext il)
+    private void Menu_SlugcatSelectMenu_SlugcatPageContinue_ctor(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 247 修改判定
@@ -526,7 +532,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 修改游戏内显示的雨循环倒计时
-    internal void HUD_SubregionTracker_Update(ILContext il)
+    private void HUD_SubregionTracker_Update(ILContext il)
     {
         Log("HUD_SubregionTracker_Update");
         ILCursor c = new ILCursor(il);
@@ -577,7 +583,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 不知道这个是干嘛的，但既然搜索搜出来了就改一下罢
-    internal void HUD_Map_CycleLabel_UpdateCycleText(ILContext il)
+    private void HUD_Map_CycleLabel_UpdateCycleText(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 23 修改判定
@@ -625,7 +631,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 修改速通验证的循环数
-    internal void ProcessManager_CreateValidationLabel(ILContext il)
+    private void ProcessManager_CreateValidationLabel(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 25 修改判定
@@ -696,29 +702,27 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal void RainWorldGame_ctor(On.RainWorldGame.orig_ctor orig, RainWorldGame self, ProcessManager processManager)
+    private void RainWorldGame_ctor(On.RainWorldGame.orig_ctor orig, RainWorldGame self, ProcessManager processManager)
     {
         orig(self, processManager);
-        /*
-            if (self.session is StoryGameSession && ModManager.CoopAvailable)
+        /*if (self.session is StoryGameSession && ModManager.CoopAvailable)
+        {
+            Log("RainWorldGame_ctor, coop available");
+            for (int i = 0; i < self.Players.Count; i++)
             {
-                Log("RainWorldGame_ctor, coop available");
-                for (int i = 0; i<self.Players.Count; i++)
-                {
-                    Log("loop:",i.ToString());
-                    if (self.Players[i].realizedCreature is not Player) { Log("not player"); continue; }
-                    if ((self.Players[i].realizedCreature as Player).slugcatStats.name != SlugcatStatsName) { Log("not pebbles, next one"); continue; }
-                    bool getModule = modules.TryGetValue((self.Players[i].realizedCreature as Player), out var module) && module.playerName == SlugcatStatsName;
-                    if (getModule) { module.canControlGravity = true; Log("coop enabled, player who can control gravity:", i.ToString()); }
-                    break;
-                }
+                Log("loop:", i.ToString());
+                if (self.Players[i].realizedCreature is not Player) { Log("not player"); continue; }
+                if ((self.Players[i].realizedCreature as Player).slugcatStats.name != SlugcatStatsName) { Log("not pebbles, next one"); continue; }
+                bool getModule = playerModules.TryGetValue((self.Players[i].realizedCreature as Player), out var module) && module.playerName == SlugcatStatsName;
+                if (getModule) { module.canControlGravity = true; Log("coop enabled, player who can control gravity:", i.ToString()); }
+                break;
             }
-        */
+        }*/
     }
 
 
     // 实际修改饱食度的函数
-    internal IntVector2 SlugcatStats_SlugcatFoodMeter(On.SlugcatStats.orig_SlugcatFoodMeter orig, SlugcatStats.Name slugcat)
+    private IntVector2 SlugcatStats_SlugcatFoodMeter(On.SlugcatStats.orig_SlugcatFoodMeter orig, SlugcatStats.Name slugcat)
     {
         return (slugcat.value == SlugcatName) ? new IntVector2(MaxFood, MinFoodNow) : orig(slugcat);
     }
@@ -728,23 +732,15 @@ class Plugin : BaseUnityPlugin
 
 
     // 随着游戏进度修改游戏内饱食度，不出意外的话，打真结局后就不会再改了
-    internal void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
+    private void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
     {
         orig(self, abstractCreature, world);
 
-        // 防止很多个人同时控制很多个重力？其实这玩意儿不应该写在这里。但是我懒得想了，
-        /*
-            if (!ModManager.CoopAvailable && self.slugcatStats.name == SlugcatStatsName)
-            {
-                bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
-                if (getModule) { module.canControlGravity = true; }
-                Log("coop disabled, can control gravity");
-            }
-        */
+        
 
         if (world.game.session is StoryGameSession && world.game.GetStorySession.characterStats.name.value == SlugcatName && self.slugcatStats.name.value == SlugcatName &&  !self.playerState.isGhost)
         {
-            modules.Add(self, new PlayerModule(self));
+            playerModules.Add(self, new PlayerModule(self));
 
             int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
             bool altEnding = (world.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding;
@@ -790,12 +786,12 @@ class Plugin : BaseUnityPlugin
 
 
 
-    
+
     // 各种update
     // 小心蛞蝓猫钻管道的时候self.room会变成null。。
-    internal void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
+    private void Player_Update(On.Player.orig_Update orig, Player self, bool eu)
     {
-        bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+        bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
 
         if (getModule) module.Update(self, eu);
 
@@ -827,215 +823,31 @@ class Plugin : BaseUnityPlugin
 
     #region 玩家技能
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
 
 
-    // 重力控制：单独绑了个按键。这个功能刚玩会觉得很鸡肋，但我试了试，低重力让我能够飞行当中一矛命中蜥蜴身体，当场开饭。高重力让我随手召唤秃鹫，单矛随便杀。
-    // 我开始理解fp为什么会说自己是神了。
-    // 以后还是把他改成，解锁结局后才能全局操控重力吧。现在我先不改，太好玩了，我先玩
-    // 特么的，出大问题。。
-    internal class GravityController : UpdatableAndDeletable
+
+
+
+
+
+    private void RoomRealizer_Update(On.RoomRealizer.orig_Update orig, RoomRealizer self)
     {
-        public Player owner;
-        public Player[] availablePlayers;
-        public int gravityControlCounter = 0;
-        public int gravityBonus = 10;
-        public int gravityControlTime = 12;
-        public float amountZeroG;
-        public float amountBrokenZeroG;
-        public bool enabled = true;
-
-        internal GravityController(Player owner)
+        orig(self);
+        foreach (RoomRealizer.RealizedRoomTracker tracker in self.realizedRooms)
         {
-            this.owner = owner;
-        }
-
-
-        // 见过屎山代码吗，如果你没见过，现在你见过了
-        public override void Update(bool eu)
-        {
-            // 这个房间我搞不定
-            if (!enabled || owner.room.abstractRoom.name == "SS_E08") return;
-            if (!owner.room.abstractRoom.name.StartsWith("SS") && !PebblesSlugOption.GravityControlOutside.Value) return;
-
-            base.Update(eu);
-            // 这就是我不懂了，他这儿的effect amount还不是真正的重力，他加了个插值，他为什么要加，我真是一点也想不明白，这除了导致我修三个小时bug以外还有什么别的用处吗
-            // 但是他这重力效果和室内灯光还是绑定的，我既不能访问这个AntiGravity的实例，又不能直接把它删了，我真的谢
-            if (owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null)
-            {
-                if (gravityBonus != (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - owner.room.gravity)) * 10f))
-                {
-                    Log("gravity mismatch IN ZEROG AREA");
-                    Log("-- room gravity: ", owner.room.gravity.ToString());
-                    gravityBonus = (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - owner.room.gravity)) * 10f);
-                }
-            }
-            else if (owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
-            {
-                if (gravityBonus != (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - owner.room.gravity)) * 10f)
-                && gravityBonus != (int)Mathf.Round(10f * 1f - owner.room.gravity))
-                {
-                    Log("gravity mismatch IN BROKEN ZEROG AREA");
-                    Log("-- room gravity: ", owner.room.gravity.ToString());
-                    gravityBonus = (int)Mathf.Round(10f * owner.room.gravity);
-                }
-            }
-            else if (gravityBonus != (int)Mathf.Round(10f * owner.room.gravity))
-            {
-                Log("gravity mismatch or coop player changing gravity: ");
-                Log("-- room gravity: ", owner.room.gravity.ToString());
-                gravityBonus = (int)Mathf.Round(10f * owner.room.gravity);
-            }
-
-            if (Input.GetKey(instance.option.GravityControlKey.Value))
-            {
-                owner.Blink(5);
-            }
-
-            if (owner.Consious && !owner.dead && owner.stun == 0
-                && owner.input[0].y != 0 && Input.GetKey(instance.option.GravityControlKey.Value)
-                && owner.bodyMode != Player.BodyModeIndex.CorridorClimb && owner.animation != Player.AnimationIndex.HangFromBeam && owner.animation != Player.AnimationIndex.ClimbOnBeam && owner.bodyMode != Player.BodyModeIndex.WallClimb && owner.animation != Player.AnimationIndex.AntlerClimb && owner.animation != Player.AnimationIndex.VineGrab && owner.animation != Player.AnimationIndex.ZeroGPoleGrab && owner.onBack == null)
-            {
-                gravityControlCounter++;
-                if (gravityControlCounter >= gravityControlTime)
-                {
-                    gravityBonus += owner.input[0].y;
-                    owner.input[0].y = 0;
-                    if (gravityBonus >= 0)
-                    {
-
-                        if (owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
-                        {
-                            Log("HAS GRAVITY EFFECT");
-                            // 如果有类似效果，由于我猜这两效果不能大于1，所以还得钳制范围
-                            if (gravityBonus <= 10)
-                            {
-                                owner.room.gravity = 1f - Mathf.Lerp(0f, 0.85f, 1f - gravityBonus * 0.1f);
-                                // 找到并修改zeroG这个效果。roomeffects竟然没有一个能让我直接找到对应效果的函数，还得我自己写for循环……
-                                for (int i = 0; i < owner.room.roomSettings.effects.Count; i++)
-                                {
-                                    if (owner.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG || owner.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
-                                    {
-                                        owner.room.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                                        Log("zeroG amount: ", owner.room.roomSettings.effects[i].amount);
-                                    }
-                                }
-                                
-                            }
-                            else { gravityBonus = 10; }
-                        }
-
-                        else
-                        {
-                            owner.room.gravity = 0.1f * gravityBonus;
-                        }
-
-                    }
-                    else { gravityBonus = 0; }
-
-                    Log("player gravity control RESULT" + owner.room.gravity);
-                    gravityControlCounter = 0;
-                }
-            }
-        }
-
-
-        public void NewRoom()
-        {
-            if (!enabled)
-            {
-                if (owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
-                {
-                    gravityBonus = (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - owner.room.gravity)) * 10f);
-                }
-                else { gravityBonus = (int)Mathf.Round(10f * owner.room.gravity); }
-                return;
-            }
-            if (owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
-            {
-                if (gravityBonus <= 10)
-                {
-                    owner.room.gravity = 0.1f * gravityBonus;
-                    // 找到并修改zeroG这个效果
-                    bool z = false;
-                    bool b = false;
-                    for (int i = 0; i < owner.room.roomSettings.effects.Count; i++)
-                    {
-                        if (owner.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG)
-                        {
-                            amountZeroG = owner.room.roomSettings.effects[i].amount;
-                            owner.room.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                            Log("room effect set - newroom - z, amount:",amountZeroG," -to- ", owner.room.roomSettings.effects[i].amount);
-                            z = true;
-                            break;
-                        }
-                        else if (owner.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
-                        {
-                            amountBrokenZeroG = owner.room.roomSettings.effects[i].amount;
-                            owner.room.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                            Log("room effect set - newroom - b, amount:", amountBrokenZeroG, " -to- ", owner.room.roomSettings.effects[i].amount);
-                            b = true;
-                            break;
-                        }
-                    }
-                    if (!z) amountZeroG = 0f;
-                    if (!b) amountBrokenZeroG = 0f;
-                    Log("NewRoom ! z,b: ", amountZeroG.ToString(), amountBrokenZeroG.ToString());
-                }
-                else
-                {
-                    Log("gravityBonus out of range, cleared");
-                    gravityBonus = (int)Mathf.Round(10f * owner.room.gravity);
-                }
-                
-            }
-            else
-            {
-                owner.room.gravity = gravityBonus * 0.1f;
-            }
-        }
-
-
-
-        public void Die()
-        {
-            if (owner.room == null) return;
-            if (owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || owner.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
-            {
-                for (int i = 0; i < owner.room.roomSettings.effects.Count; i++)
-                {
-                    if (owner.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG)
-                    {
-                        owner.room.roomSettings.effects[i].amount = amountZeroG;
-                        Log("room effect set to original value because player died - ZeroG ", owner.room.roomSettings.effects[i].amount);
-                        break;
-                    }
-                    else if (owner.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
-                    {
-                        owner.room.roomSettings.effects[i].amount = amountBrokenZeroG;
-                        Log("room effect set to original value because player died - BrokenZeroG ", owner.room.roomSettings.effects[i].amount);
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                owner.room.gravity = 1f;
-                gravityBonus = 10;
-                Log("gravity set to 1.0 because player died");
-            }
+            if (tracker.room.realizedRoom == null) return;
+            Log("realized room: ", tracker.room.name, "gravity: ", tracker.room.realizedRoom.gravity);
+            // 对喽 就是他 他这里有所有我需要修改重力的房间
+            // 坏了 这儿够不到player实例
             
         }
+    }
 
 
-        public override void Destroy()
-        {
-            base.Destroy();
-        }
-
-
-
-
+    private void RoomPreparer_Update(On.RoomPreparer.orig_Update orig, RoomPreparer self)
+    {
+        orig(self);
+        Log("RoomPreparer_Update, room: ", self.room.abstractRoom.name);
     }
 
 
@@ -1045,25 +857,10 @@ class Plugin : BaseUnityPlugin
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // 垃圾回收
-    internal void Player_Destroy(On.Player.orig_Destroy orig, Player self)
+    private void Player_Destroy(On.Player.orig_Destroy orig, Player self)
     {
-        bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+        bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
         if (getModule)
         {
             module.gravityController?.Destroy();
@@ -1075,9 +872,9 @@ class Plugin : BaseUnityPlugin
 
 
     // 防止你那倒霉的联机队友在你死了之后顶着3倍重力艰难行走。我知道队友有可能也会控制重力，但是我懒得加判断
-    internal void Player_Die(On.Player.orig_Die orig, Player self)
+    private void Player_Die(On.Player.orig_Die orig, Player self)
     {
-        bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+        bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
         if (getModule && self.slugcatStats.name == SlugcatStatsName)
         {
             module.gravityController.Die();
@@ -1091,10 +888,10 @@ class Plugin : BaseUnityPlugin
 
 
     // 房间发生变化时保留重力变化
-    internal void Player_NewRoom(On.Player.orig_NewRoom orig, Player self, Room newRoom)
+    private void Player_NewRoom(On.Player.orig_NewRoom orig, Player self, Room newRoom)
     {
         orig(self, newRoom);
-        bool getModule = modules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+        bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
         if (getModule && self.slugcatStats.name == SlugcatStatsName)
         {
             module.gravityController.NewRoom();
@@ -1109,7 +906,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 不能吃神经元。我想这个应该用不着调用原版方法了吧。。
-    internal bool Player_CanBeSwallowed(On.Player.orig_CanBeSwallowed orig, Player self, PhysicalObject testObj)
+    private bool Player_CanBeSwallowed(On.Player.orig_CanBeSwallowed orig, Player self, PhysicalObject testObj)
     {
         if (self.slugcatStats.name.value == SlugcatName)
         {
@@ -1121,7 +918,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal void Player_Jump(On.Player.orig_Jump orig, Player self)
+    private void Player_Jump(On.Player.orig_Jump orig, Player self)
     {
         orig(self);
         if (self.slugcatStats.name.value == SlugcatName)
@@ -1133,12 +930,12 @@ class Plugin : BaseUnityPlugin
 
 
     // 一矛超人，只要不使用二段跳，就是常驻2倍矛伤。使用二段跳会导致这个伤害发生衰减，最低不低于0.5。修改slugbase的基础矛伤可以使所有的值发生变化
-    internal void Player_ThrownSpear(On.Player.orig_ThrownSpear orig, Player self, Spear spear)
+    private void Player_ThrownSpear(On.Player.orig_ThrownSpear orig, Player self, Spear spear)
     {
         orig(self, spear);
         if (self.slugcatStats.name.value == SlugcatName)
         {
-            float spearDmgBonus = 1.5f;
+            float spearDmgBonus = 1f;
             if (self.pyroJumpCounter > 0)
             {
                 spearDmgBonus /= self.pyroJumpCounter;
@@ -1151,14 +948,14 @@ class Plugin : BaseUnityPlugin
 
 
 
-    
+
 
 
 
     // 除了特效以外，数值跟炸猫差不多，因为我不知道那堆二段跳的数值怎么改。我想改得小一点，让他没有那么强的机动性，不然太超模了（
     // 因为这个电击在水下是有伤害的（痛击你的队友。jpg）我不是故意的，我是真的写不出来那个判定。我不知道他为什么会闪退。。
     // 我大概应该用原版方法，然后做ilhooking。但是，说真的，想想那个工作量吧（汗）我都不太清楚自己究竟改了些什么
-    internal void Player_ClassMechanicsArtificer(On.Player.orig_ClassMechanicsArtificer orig, Player self)
+    private void Player_ClassMechanicsArtificer(On.Player.orig_ClassMechanicsArtificer orig, Player self)
     {
         // Log("slugcat name: "+ self.slugcatStats.name.value);
         if (self.slugcatStats.name.value == SlugcatName)
@@ -1474,7 +1271,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal AbstractPhysicalObject.AbstractObjectType Player_CraftingResults(On.Player.orig_CraftingResults orig, Player self)
+    private AbstractPhysicalObject.AbstractObjectType Player_CraftingResults(On.Player.orig_CraftingResults orig, Player self)
     {
         if (self.slugcatStats.name.value == SlugcatName)
         {
@@ -1519,7 +1316,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal bool Player_GraspsCanBeCrafted(On.Player.orig_GraspsCanBeCrafted orig, Player self)
+    private bool Player_GraspsCanBeCrafted(On.Player.orig_GraspsCanBeCrafted orig, Player self)
     {
 
         if (self.slugcatStats.name.value == SlugcatName && (self.CraftingResults() != null))
@@ -1535,7 +1332,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 下面这个暂时没用，但先留着以防我日后突然想给他加点别的能力
-    internal void Player_SwallowObject(On.Player.orig_SwallowObject orig, Player self, int grasp)
+    private void Player_SwallowObject(On.Player.orig_SwallowObject orig, Player self, int grasp)
     {
         if (self.slugcatStats.name.value == SlugcatName)
         {
@@ -1585,7 +1382,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal void Player_SpitUpCraftedObject(ILContext il)
+    private void Player_SpitUpCraftedObject(ILContext il)
     {
         ILCursor c = new(il);
         // 37 劫持炸矛判定，在此判定电矛。所以有没有人告诉我match到底该怎么写，我不想写这么大一坨，很累的
@@ -1607,7 +1404,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    internal void Player_SpitUpCraftedObject_old(On.Player.orig_SpitUpCraftedObject orig, Player self)
+    private void Player_SpitUpCraftedObject_old(On.Player.orig_SpitUpCraftedObject orig, Player self)
     {
         if (self.slugcatStats.name.value == SlugcatName)
         {
@@ -1701,7 +1498,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 啊！！终于把原来那一坨复制粘贴删了！！感觉像新年的第一天穿上新内裤一样清爽啊！！
-    internal void Player_GrabUpdate(ILContext il)
+    private void Player_GrabUpdate(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 337末尾，修改神经元的可食用性。没错，我要借用一下他自带的那个brfalse。。因为我自己不会写！！
@@ -1772,7 +1569,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 被电不仅不会死，还会吃饱（？
-    internal void ZapCoil_Update(ILContext il)
+    private void ZapCoil_Update(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 182，还是那个劫持判定
@@ -1813,7 +1610,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 同理，现在可以免疫蜈蚣的电击，甚至吃上一顿
-    internal void Centipede_Shock(ILContext il)
+    private void Centipede_Shock(ILContext il)
     {
          ILCursor c = new ILCursor(il);
         // 226，还是那个劫持判定，修改蜈蚣的体重让他无论如何都会小于玩家体重
@@ -1852,7 +1649,7 @@ class Plugin : BaseUnityPlugin
     // 不能免疫蜈蚣的电击，但我认为这不是我的问题，是蜈蚣的问题。
     // 错了，好像是我的问题，这个violence怎么说
     // 没事了，确实是蜈蚣的问题，大蜈蚣电击致死是硬编码的
-    internal void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
+    private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
     {
         if (self is Player && (self as Player).slugcatStats.name.value == SlugcatName)
         {

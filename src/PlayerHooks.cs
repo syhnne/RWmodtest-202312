@@ -48,14 +48,12 @@ internal class PlayerHooks
 {
 
 
-    public static ConditionalWeakTable<Player, PlayerModule> modules = new ConditionalWeakTable<Player, PlayerModule>();
-
-
-
 
     internal static void Apply()
     {
         // On.RainWorld.Update += RainWorld_Update;
+        On.HUD.HUD.InitSinglePlayerHud += HUD_InitSinglePlayerHud;
+        // On.RoomCamera.FireUpSinglePlayerHUD += RoomCamera_FireUpSinglePlayerHUD;
     }
 
 
@@ -68,11 +66,9 @@ internal class PlayerHooks
         internal readonly SlugcatStats.Name storyName;
         internal readonly bool isPebbles;
 
-        internal Oracle oracle;
-        internal OracleGraphics oracleGraphics;
         internal bool movementInputOnly = false;
         
-        internal Plugin.GravityController gravityController;
+        internal GravityController gravityController;
 
 
         public PlayerModule(Player player)
@@ -89,7 +85,7 @@ internal class PlayerHooks
 
             if (playerName == Plugin.SlugcatStatsName && storyName != null)
             {
-                gravityController = new Plugin.GravityController(player);
+                gravityController = new GravityController(player);
             }
             if (isPebbles)
             {
@@ -108,6 +104,36 @@ internal class PlayerHooks
         }
 
     }
+
+
+
+
+
+
+
+    // 重力显示
+    private static void HUD_InitSinglePlayerHud(On.HUD.HUD.orig_InitSinglePlayerHud orig, HUD.HUD self, RoomCamera cam)
+    {
+        orig(self, cam);
+        if ((self.owner as Player).slugcatStats.name == Plugin.SlugcatStatsName)
+        {
+            bool getModule = Plugin.playerModules.TryGetValue((self.owner as Player), out var module) && module.playerName == Plugin.SlugcatStatsName;
+            if (getModule)
+            {
+                Plugin.Log("HUD add part");
+                self.AddPart(new GravityMeter(self, self.fContainers[1], module.gravityController));
+            }
+
+        }
+
+    }
+
+
+
+
+
+
+
 
 
     private static void RainWorld_Update(On.RainWorld.orig_Update orig, RainWorld self)
