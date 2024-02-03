@@ -31,7 +31,6 @@ internal class CustomLore
 
     internal static void Apply()
     {
-        // On.RainWorldGame.BeatGameMode += RainWorldGame_BeatGameMode;
 
         On.RainWorldGame.Win += RainWorldGame_Win;
 
@@ -41,14 +40,15 @@ internal class CustomLore
         // On.Menu.SlugcatSelectMenu.ctor += Menu_SlugcatSelectMenu_ctor;
         // On.Menu.SlugcatSelectMenu.MineForSaveData += Menu_SlugcatSelectMenu_MineForSaveData;
 
-        On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.Update += MSCRoomSpecificScript_GourmandEnding_Update;
+
+        // 防止玩家归乡，发布的时候记得取消注释
+        // On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.Update += MSCRoomSpecificScript_GourmandEnding_Update;
+
+
         IL.SaveState.LoadGame += SaveState_LoadGame;
-
         On.RainWorldGame.GoToRedsGameOver += RainWorldGame_GoToRedsGameOver;
-
         On.RainWorldGame.BeatGameMode += RainWorldGame_BeatGameMode;
-
-        On.Room.Loaded += Room_Loaded;
+        // On.Room.Loaded += Room_Loaded;
 
     }
 
@@ -262,7 +262,7 @@ internal class CustomLore
             else if (self.GetStorySession.saveState.deathPersistentSaveData.altEnding)
             {
                 self.manager.statsAfterCredits = true;
-                // 暂时代替一下
+                // 暂时代替一下。虽然但是，归乡的时候这个也不会显示
                 self.manager.nextSlideshow = MoreSlugcatsEnums.SlideShowID.GourmandAltEnd;
                 self.manager.RequestMainProcessSwitch(ProcessManager.ProcessID.SlideShow);
                 return;
@@ -310,9 +310,8 @@ internal class CustomLore
             // game.rainWorld.progression.miscProgressionData.beaten_（） = true;
             // 下面这个不要了，不出意外的话打完真结局会有类似功能
             // game.GetStorySession.saveState.deathPersistentSaveData.karma = game.GetStorySession.saveState.deathPersistentSaveData.karmaCap;
+            game.GetStorySession.saveState.deathPersistentSaveData.altEnding = true;
             game.GetStorySession.saveState.BringUpToDate(game);
-            // 以下取决于操控重力的功能到底要不要全局生效
-            game.manager.specialUnlockText = game.rainWorld.inGameTranslator.Translate("[TODO: gravity control is now available in any area]");
             AbstractCreature abstractCreature = game.FirstAlivePlayer;
             abstractCreature ??= game.FirstAnyPlayer;
             game.GetStorySession.saveState.AppendCycleToStatistics(abstractCreature.realizedCreature as Player, game.GetStorySession, false, 0);
@@ -332,6 +331,7 @@ internal class CustomLore
 
 
     // 防止玩家用特殊手段归乡（别想在酒吧点炒饭
+    // 我暂且先禁用这个函数，因为我正经结局没做好，先拿归乡结局代替一下（目移
     private static void MSCRoomSpecificScript_GourmandEnding_Update(On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.orig_Update orig, MSCRoomSpecificScript.OE_GourmandEnding self, bool eu)
     {
         if (!ModManager.CoopAvailable)
@@ -364,6 +364,7 @@ internal class CustomLore
     private static void Room_Loaded(On.Room.orig_Loaded orig, Room self)
     {
         orig(self);
+        // 在这里加入roomspecificscript。救命。没人讲过开发者工具怎么用，结果我就把那个SS_AI房间的什么着色效果给搞坏了，现在每次进去都会被橙色闪瞎狗眼。。
         Plugin.Log("Room_Loaded: ", self.abstractRoom.name);
     }
 

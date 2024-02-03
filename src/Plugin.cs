@@ -30,6 +30,7 @@ using static PebblesSlug.PlayerHooks;
 using System.Runtime.InteropServices;
 using static MonoMod.InlineRT.MonoModRule;
 using System.Runtime.CompilerServices;
+using IL.Menu;
 
 
 
@@ -49,6 +50,7 @@ class Plugin : BaseUnityPlugin
 {
     internal const string MOD_ID = "PebblesSlug_by_syhnne";
     public static ConditionalWeakTable<Player, PlayerModule> playerModules = new ConditionalWeakTable<Player, PlayerModule>();
+    public static ConditionalWeakTable<Oracle, OracleModule> oracleModules = new ConditionalWeakTable<Oracle, OracleModule>();
 
 
 
@@ -78,8 +80,9 @@ class Plugin : BaseUnityPlugin
     internal static readonly Oracle.OracleID oracleID = new Oracle.OracleID("PL");
     internal static readonly bool ShowLogs = true;
     internal static Plugin instance;
-    // 以防我测试的时候不能使用这个功能，发布的时候就改成false
-    public static bool GravityControlUnlock = true;
+    internal HUD.HUD Hud;
+    // 以防我测试的时候不能使用一些功能，发布的时候就改成false
+    public static bool DevMode = true;
 
 
 
@@ -133,16 +136,19 @@ class Plugin : BaseUnityPlugin
             On.Player.Jump += Player_Jump;
 
             On.Player.ctor += Player_ctor;
-            On.RainWorldGame.ctor += RainWorldGame_ctor;
+            // On.RainWorldGame.ctor += RainWorldGame_ctor;
             On.Player.Update += Player_Update;
             On.Player.NewRoom += Player_NewRoom;
             On.Player.Die += Player_Die;
             On.Player.Destroy += Player_Destroy;
+            On.Player.ObjectCountsAsFood += Player_ObjectCountsAsFood;
+            // On.Player.AddFood += Player_AddFood;
             // On.RoomPreparer.Update += RoomPreparer_Update;
             // On.RoomRealizer.Update += RoomRealizer_Update;
 
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
-            IL.ZapCoil.Update += ZapCoil_Update;
+            IL.ZapCoil.Update += IL_ZapCoil_Update;
+            On.ZapCoil.Update += ZapCoil_Update;
             IL.Centipede.Shock += Centipede_Shock;
 
 
@@ -153,7 +159,7 @@ class Plugin : BaseUnityPlugin
             // IL.SlugcatStats.ctor += IL_SlugcatStats_ctor;
             On.SlugcatStats.SlugcatFoodMeter += SlugcatStats_SlugcatFoodMeter;
 
-
+            On.RegionGate.customKarmaGateRequirements += RegionGate_customKarmaGateRequirements;
 
             IL.HUD.Map.CycleLabel.UpdateCycleText += HUD_Map_CycleLabel_UpdateCycleText;
             IL.HUD.SubregionTracker.Update += HUD_SubregionTracker_Update;
@@ -183,6 +189,17 @@ class Plugin : BaseUnityPlugin
             typeof(SaveState).GetProperty(nameof(SaveState.SlowFadeIn), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
             SaveState_SlowFadeIn
             );
+
+            new Hook(
+            typeof(SSOracleSwarmer).GetProperty(nameof(SSOracleSwarmer.Edible), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            SSOracleSwarmer_Edible
+            );
+
+            new Hook(
+            typeof(SLOracleSwarmer).GetProperty(nameof(SLOracleSwarmer.Edible), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            SLOracleSwarmer_Edible
+            );
+
             
 
 
@@ -190,8 +207,8 @@ class Plugin : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            Debug.LogException(ex);
             base.Logger.LogError(ex);
+            throw;
         }
 
     }
@@ -207,6 +224,7 @@ class Plugin : BaseUnityPlugin
             bool isInit = this.IsInit;
             if (!isInit)
             {
+                LogStat("INIT");
                 this.IsInit = true;
                 Futile.atlasManager.LoadAtlas("atlases/fp_head");
                 Futile.atlasManager.LoadAtlas("atlases/fp_tail");
@@ -229,9 +247,23 @@ class Plugin : BaseUnityPlugin
             { 
                 log += s.ToString(); 
             }
-            Debug.Log("[PebblesSlug] " + log);
+            Debug.Log("[PebblesSlug] : " + log);
         }
             
+    }
+
+    public static void LogStat(params object[] text)
+    {
+        if (ShowLogs)
+        {
+            string log = "";
+            foreach (object s in text)
+            {
+                log += s.ToString();
+            }
+            Debug.Log("[PebblesSlug] " + log);
+        }
+
     }
 
 
@@ -380,12 +412,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-
-
-
-
-
-
+    
 
 
 
@@ -397,7 +424,7 @@ class Plugin : BaseUnityPlugin
         var result = orig(self);
         if (self.saveStateNumber.value == SlugcatName)
         {
-            result = Mathf.Max(self.malnourished ? 4f : 0.8f, (self.cycleNumber >= RedsIllness.RedsCycles(self.redExtraCycles) && !Custom.rainWorld.ExpeditionMode) ? Custom.LerpMap((float)self.cycleNumber, (float)RedsIllness.RedsCycles(false), (float)(RedsIllness.RedsCycles(false) + 5), 4f, 15f) : 0.8f);
+            result = Mathf.Max(self.malnourished ? 4f : 0.8f, (self.cycleNumber >= RedsIllness.RedsCycles(self.redExtraCycles) && !self.deathPersistentSaveData.altEnding && !Custom.rainWorld.ExpeditionMode) ? Custom.LerpMap((float)self.cycleNumber, (float)RedsIllness.RedsCycles(false), (float)(RedsIllness.RedsCycles(false) + 5), 4f, 15f) : 0.8f);
         }
         return result;
     }
@@ -412,8 +439,10 @@ class Plugin : BaseUnityPlugin
         var result = orig(self);
         if (self.player.slugcatStats.name.value == SlugcatName)
         {
-            result = Mathf.Max(0.25f, 1f / (Mathf.Ceil(self.cycle * 0.25f) + 1f));
-            Log("RedsIllness_FoodFac" + result.ToString());
+            // 还是那个同款函数
+            /*int r = 1 + (int)Math.Floor((float)(self.cycle+5) / Cycles * (MaxFood + 1 - MinFood));
+            result = 1f / (float)r;*/
+            result = Mathf.Max(0.2f, 1f / ((float)self.cycle * 0.25f + 2f));
         }
         return result;
     }
@@ -429,7 +458,6 @@ class Plugin : BaseUnityPlugin
         if (self.player.slugcatStats.name.value == SlugcatName)
         {
             result = self.player.slugcatStats.foodToHibernate;
-            Log("RedsIllness_FoodToBeOkay" + result.ToString());
         }
         return result;
     }
@@ -470,9 +498,10 @@ class Plugin : BaseUnityPlugin
             ))
         {
             c.Emit(OpCodes.Ldarg, 4);
-            c.EmitDelegate<Func<bool, SlugcatStats.Name, bool>>((isRed, name) =>
+            c.Emit(OpCodes.Ldarg_0);
+            c.EmitDelegate<Func<bool, SlugcatStats.Name, Menu.SlugcatSelectMenu.SlugcatPageContinue, bool>>((isRed, name, menu) =>
             {
-                return isRed || name.value == SlugcatName;
+                return isRed || (name.value == SlugcatName && !menu.saveGameData.altEnding);
             });
         }
 
@@ -495,7 +524,11 @@ class Plugin : BaseUnityPlugin
                 if (name.value == SlugcatName)
                 {
                     int cycle = menu.saveGameData.cycle;
-                    int result = MinFood + (int)Math.Floor((float)cycle / Cycles * (MaxFood + 1 - MinFood));
+                    int result = MinFood;
+                    if (!menu.saveGameData.altEnding)
+                    {
+                        result = MinFood + (int)Math.Floor((float)cycle / Cycles * (MaxFood + 1 - MinFood));
+                    }
                     return Math.Min(result, MaxFood);
                 }
                 return foodToHibernate;
@@ -534,7 +567,6 @@ class Plugin : BaseUnityPlugin
     // 修改游戏内显示的雨循环倒计时
     private void HUD_SubregionTracker_Update(ILContext il)
     {
-        Log("HUD_SubregionTracker_Update");
         ILCursor c = new ILCursor(il);
         // 164 修改是否是红猫的判定
         if (c.TryGotoNext(MoveType.After,
@@ -548,11 +580,10 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Log("Match successfully! - HUD_SubregionTracker_Update - 164");
             c.Emit(OpCodes.Ldloc_0);
             c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
             {
-                return isRed || player.slugcatStats.name.value == SlugcatName;
+                return isRed || (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName && !player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding);
             });
         }
 
@@ -571,7 +602,7 @@ class Plugin : BaseUnityPlugin
             c2.Emit(OpCodes.Ldloc_0);
             c2.EmitDelegate<Func<int, Player, int>>((RedsCycles, player) =>
             {
-                if (player.slugcatStats.name.value == SlugcatName)
+                if (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
                 {
                     return Cycles;
                 }
@@ -599,7 +630,7 @@ class Plugin : BaseUnityPlugin
             c.Emit(OpCodes.Ldloc_0); //Player
             c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
             {
-                return isRed || player.slugcatStats.name.value == SlugcatName;
+                return isRed || (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && !player.abstractCreature.world.game.GetStorySession.saveState.deathPersistentSaveData.altEnding);
             });
         }
         ILCursor c2 = new ILCursor(il);
@@ -617,11 +648,7 @@ class Plugin : BaseUnityPlugin
             c2.Emit(OpCodes.Ldloc_0); //Player
             c2.EmitDelegate<Func<int, Player, int>>((redsCycles, player) =>
             {
-                if (player.slugcatStats.name.value == SlugcatName)
-                {
-                    return Cycles;
-                }
-                return redsCycles;
+                return player.slugcatStats.name.value == SlugcatName ? Cycles : redsCycles;
             });
         }
     }
@@ -644,9 +671,10 @@ class Plugin : BaseUnityPlugin
             ))
         {
             c.Emit(OpCodes.Ldloc_1);
-            c.EmitDelegate<Func<bool, SlugcatStats.Name, bool>>((isRed, name) =>
+            c.Emit(OpCodes.Ldloc_2);
+            c.EmitDelegate<Func<bool, SlugcatStats.Name, Menu.SlugcatSelectMenu.SaveGameData, bool>>((isRed, name, saveGameData) =>
             {
-                return isRed || name.value == SlugcatName;
+                return isRed || (name.value == SlugcatName && !saveGameData.altEnding);
             });
         }
 
@@ -738,13 +766,16 @@ class Plugin : BaseUnityPlugin
 
         
 
-        if (world.game.session is StoryGameSession && world.game.GetStorySession.characterStats.name.value == SlugcatName && self.slugcatStats.name.value == SlugcatName &&  !self.playerState.isGhost)
+        if (world.game.session is StoryGameSession && world.game.GetStorySession.characterStats.name.value == SlugcatName && self.slugcatStats.name.value == SlugcatName)
         {
             playerModules.Add(self, new PlayerModule(self));
+            // 这东西不会把无人机显示出来罢。。我只是想进大都会看看
+            // 悲报：会
+            // (world.game.session as StoryGameSession).saveState.hasRobo = true;
 
             int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
             bool altEnding = (world.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding;
-            Log(cycle.ToString(),"<=cycle  altEnding=>", altEnding.ToString());
+            LogStat("Player_ctor - cycle: ", cycle.ToString()," altEnding: ", altEnding.ToString());
             if (cycle > 5 && !altEnding)
             {
                 self.redsIllness = new RedsIllness(self, cycle - 5);
@@ -775,6 +806,50 @@ class Plugin : BaseUnityPlugin
 
 
 
+    // 纯属复制粘贴游戏代码，只为绕过香菇病效果（
+    private void CustomAddFood(Player player, int add)
+    {
+        if (player == null) { return; }
+        add = Math.Min(add, player.MaxFoodInStomach - player.playerState.foodInStomach);
+        if (ModManager.CoopAvailable && player.abstractCreature.world.game.IsStorySession && player.abstractCreature.world.game.Players[0] != player.abstractCreature && !player.isNPC)
+        {
+            PlayerState playerState = player.abstractCreature.world.game.Players[0].state as PlayerState;
+            add = Math.Min(add, Math.Max(player.MaxFoodInStomach - playerState.foodInStomach, 0));
+            Log(string.Format("Player add food {0}. Amount to add {1}", player.playerState.playerNumber, add), false);
+            playerState.foodInStomach += add;
+        }
+        if (player.abstractCreature.world.game.IsStorySession && player.AI == null)
+        {
+            player.abstractCreature.world.game.GetStorySession.saveState.totFood += add;
+        }
+        player.playerState.foodInStomach += add;
+        if (player.FoodInStomach >= player.MaxFoodInStomach)
+        {
+            player.playerState.quarterFoodPoints = 0;
+        }
+        if (player.slugcatStats.malnourished && player.playerState.foodInStomach >= ((player.redsIllness != null) ? player.redsIllness.FoodToBeOkay : player.slugcatStats.maxFood))
+        {
+            if (player.redsIllness != null)
+            {
+                Log("FoodToBeOkay: ", player.redsIllness.FoodToBeOkay);
+                player.redsIllness.GetBetter();
+                return;
+            }
+            if (!player.isSlugpup)
+            {
+                player.SetMalnourished(false);
+            }
+            if (player.playerState is PlayerNPCState)
+            {
+                (player.playerState as PlayerNPCState).Malnourished = false;
+            }
+        }
+    }
+
+
+
+
+
 
 
 
@@ -795,7 +870,7 @@ class Plugin : BaseUnityPlugin
 
         if (getModule) module.Update(self, eu);
 
-        if (getModule && self.slugcatStats.name == SlugcatStatsName && self.room != null && self.room.game.session is StoryGameSession)
+        if (getModule && self.slugcatStats.name == SlugcatStatsName && self.room != null && self.room.game != null && self.room.game.session is StoryGameSession)
         {
             module.gravityController?.Update(eu);
         }
@@ -823,6 +898,60 @@ class Plugin : BaseUnityPlugin
 
     #region 玩家技能
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    // 还是那个不能吃神经元
+    private bool Player_ObjectCountsAsFood(On.Player.orig_ObjectCountsAsFood orig, Player self, PhysicalObject obj)
+    {
+        bool result = orig(self, obj);
+        if ( self.slugcatStats.name == Plugin.SlugcatStatsName)
+        {
+            result = result && !(obj is OracleSwarmer);
+        }
+        return result;
+    }
+
+
+
+    private delegate bool orig_SLOracleSwarmerEdible(SLOracleSwarmer self);
+    private bool SLOracleSwarmer_Edible(orig_SLOracleSwarmerEdible orig, SLOracleSwarmer self)
+    {
+        var result = orig(self);
+        if (self.grabbedBy[0] != null && self.grabbedBy[0].grabber is Player && (self.grabbedBy[0].grabber as Player).slugcatStats.name == Plugin.SlugcatStatsName)
+        {
+            result = false;
+        }
+        return result;
+    }
+
+
+
+    private delegate bool orig_SSOracleSwarmerEdible(SSOracleSwarmer self);
+    private bool SSOracleSwarmer_Edible(orig_SSOracleSwarmerEdible orig, SSOracleSwarmer self)
+    {
+        var result = orig(self);
+        if (self.grabbedBy[0] != null && self.grabbedBy[0].grabber is Player && (self.grabbedBy[0].grabber as Player).slugcatStats.name == Plugin.SlugcatStatsName)
+        {
+            result = false;
+        }
+        return result;
+    }
+
+
+
+
+
+
+    // 能进大都会
+    private void RegionGate_customKarmaGateRequirements(On.RegionGate.orig_customKarmaGateRequirements orig, RegionGate self)
+    {
+        orig(self);
+        if (self.room.abstractRoom.name == "GATE_UW_LC" && self.room.game.session is StoryGameSession && self.room.game.GetStorySession.saveStateNumber == SlugcatStatsName)
+        {
+            self.karmaRequirements[0] = RegionGate.GateRequirement.OneKarma;
+        }
+    }
+
 
 
 
@@ -895,6 +1024,10 @@ class Plugin : BaseUnityPlugin
         if (getModule && self.slugcatStats.name == SlugcatStatsName)
         {
             module.gravityController.NewRoom();
+            if (self.room.abstractRoom.name != "SS_AI")
+            {
+                module.console.isActive = false;
+            }
         }
     }
 
@@ -941,7 +1074,7 @@ class Plugin : BaseUnityPlugin
                 spearDmgBonus /= self.pyroJumpCounter;
             }
             spear.spearDamageBonus *= (0.5f + spearDmgBonus);
-            Log("spearDmgBonus: " + (0.5f+spearDmgBonus) + "  result: " + spear.spearDamageBonus);
+            LogStat("spearDmgBonus: " + (0.5f+spearDmgBonus) + "  result: " + spear.spearDamageBonus);
         }
         
     }
@@ -951,7 +1084,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-
+    // TODO: 给这一坨东西单独做一个类
     // 除了特效以外，数值跟炸猫差不多，因为我不知道那堆二段跳的数值怎么改。我想改得小一点，让他没有那么强的机动性，不然太超模了（
     // 因为这个电击在水下是有伤害的（痛击你的队友。jpg）我不是故意的，我是真的写不出来那个判定。我不知道他为什么会闪退。。
     // 我大概应该用原版方法，然后做ilhooking。但是，说真的，想想那个工作量吧（汗）我都不太清楚自己究竟改了些什么
@@ -1286,25 +1419,25 @@ class Plugin : BaseUnityPlugin
                     }
                 }
                 //要实现的效果：只拦截有电的电矛。没电的电矛、炸矛、普通矛都不拦截
+                // 没事了，现在电矛能吃（大雾
                 if (grasps[0] != null && grasps[0].grabbed is Spear)
                 {
-                    AbstractPhysicalObject spear = self.grasps[0].grabbed.abstractPhysicalObject;
-
-                    if (!((spear as AbstractSpear).electric && (spear as AbstractSpear).electricCharge > 0))
-                    {
-                        return AbstractPhysicalObject.AbstractObjectType.Spear;
-                    }
+                    return AbstractPhysicalObject.AbstractObjectType.Spear;
 
                 }
                 if (grasps[0] == null && grasps[1] != null && grasps[1].grabbed is Spear && self.objectInStomach == null)
                 {
-                    AbstractPhysicalObject spear = self.grasps[1].grabbed.abstractPhysicalObject;
-                    if (!((spear as AbstractSpear).electric && (spear as AbstractSpear).electricCharge > 0))
-                    {
-                        return AbstractPhysicalObject.AbstractObjectType.Spear;
-                    }
+                    return AbstractPhysicalObject.AbstractObjectType.Spear;
                 }
 
+            }
+            else if (PebblesSlugOption.AddFoodOnShock.Value && self.grasps[0] != null && self.grasps[0].grabbed is ElectricSpear && (self.grasps[0].grabbed as Spear).abstractSpear.electricCharge > 0)
+            {
+                return AbstractPhysicalObject.AbstractObjectType.Spear;
+            }
+            else if (PebblesSlugOption.AddFoodOnShock.Value && self.grasps[0] == null && self.grasps[1] != null && self.grasps[1].grabbed is ElectricSpear && self.objectInStomach == null && (self.grasps[0].grabbed as Spear).abstractSpear.electricCharge > 0)
+            {
+                return AbstractPhysicalObject.AbstractObjectType.Spear;
             }
             return null;
         }
@@ -1354,13 +1487,11 @@ class Plugin : BaseUnityPlugin
             self.objectInStomach.realizedObject.RemoveFromRoom();
             self.objectInStomach.Abstractize(self.abstractCreature.pos);
             self.objectInStomach.Room.RemoveEntity(self.objectInStomach);
-            Debug.Log("==== swallowobject");
             if (self.FoodInStomach > 0)
             {
                 if (abstractPhysicalObject.type == AbstractPhysicalObject.AbstractObjectType.Spear && !(abstractPhysicalObject as AbstractSpear).explosive && !(abstractPhysicalObject as AbstractSpear).electric)
                 {
                     // 这应该是生成矛的代码。那么它为什么不起作用呢（恼
-                    Debug.Log("==== swallowobject: holding spear but why isn't this working");
                     abstractPhysicalObject = new AbstractSpear(self.room.world, null, self.room.GetWorldCoordinate(self.mainBodyChunk.pos), self.room.game.GetNewID(), true);
                     // 经测试，生成炸矛和下面的代码无关（1）那么我加这hook有用吗？一会把它删了逝逝
                     self.SubtractFood(1);
@@ -1421,7 +1552,7 @@ class Plugin : BaseUnityPlugin
                     AbstractPhysicalObject abstractPhysicalObject = self.grasps[i].grabbed.abstractPhysicalObject;
                     // 这应该是具体的生成规则，我不知道这里有没有bug。。他完全没说把什么矛合成什么矛，这些东西都是分开的，放在不同的函数里的。
                     // 错误的，他做炸矛的时候压根没调用这个函数，给我cpu干烧了。他是哪一步做出来的？？
-                    if (abstractPhysicalObject.type == AbstractPhysicalObject.AbstractObjectType.Spear && !((abstractPhysicalObject as AbstractSpear).electric && (abstractPhysicalObject as AbstractSpear).electricCharge > 0))
+                    if (abstractPhysicalObject.type == AbstractPhysicalObject.AbstractObjectType.Spear)
                     {
                         if ((abstractPhysicalObject as AbstractSpear).explosive)
                         {
@@ -1467,6 +1598,17 @@ class Plugin : BaseUnityPlugin
                             explosiveSpear.room.InGameNoise(new InGameNoise(vector, 8000f, explosiveSpear, 1f));
                             explosiveSpear.Destroy();
                         }
+                        else if (PebblesSlugOption.AddFoodOnShock.Value && (abstractPhysicalObject as AbstractSpear).electric && (abstractPhysicalObject as AbstractSpear).electricCharge > 0)
+                        {
+                            // 其实电矛是一种用来储存食物的工具（大雾
+                            ElectricSpear electricSpear = (self.grasps[i].grabbed) as ElectricSpear;
+                            // 绕过香菇病的一种加食物方法
+                            // 喵的，这东西会卡bug
+                            /*(self.abstractCreature.world.game.Players[0].state as PlayerState).foodInStomach += Math.Min(2, (abstractPhysicalObject as AbstractSpear).electricCharge);*/
+                            // self.AddFood(Math.Min(2, (abstractPhysicalObject as AbstractSpear).electricCharge));
+                            CustomAddFood(self, (abstractPhysicalObject as AbstractSpear).electricCharge);
+                            electricSpear.abstractSpear.electricCharge = 0;
+                        }
                         else
                         {
                             self.ReleaseGrasp(i);
@@ -1477,6 +1619,7 @@ class Plugin : BaseUnityPlugin
                             AbstractSpear abstractSpear = new AbstractSpear(self.room.world, null, self.abstractCreature.pos, self.room.game.GetNewID(), false, true);
                             self.room.abstractRoom.AddEntity(abstractSpear);
                             abstractSpear.RealizeInRoom();
+                            abstractSpear.electricCharge = 2;
                             if (self.FreeHand() != -1)
                             {
                                 self.SlugcatGrab(abstractSpear.realizedObject, self.FreeHand());
@@ -1489,6 +1632,15 @@ class Plugin : BaseUnityPlugin
         }
         else { orig(self); }
     }
+
+
+
+
+
+
+
+ 
+
 
 
 
@@ -1544,17 +1696,20 @@ class Plugin : BaseUnityPlugin
             ))
         {
             c2.Emit(OpCodes.Ldarg_0);
-            c2.EmitDelegate<Func<bool, Player, bool>>((isArtificer, self) => 
+            c2.EmitDelegate<Func<bool, Player, bool>>((isArtificer, self) =>
             {
                 if (self.slugcatStats.name.value == SlugcatName)
                 {
-                    return true;
+                    // 这么做是为了防止误触，因为我自己特么的误触好几次了，我想吃东西来着结果吃到刚才用来鲨人的矛，反倒吐了两格
+                    if (Plugin.instance.option.CraftKey.Value == KeyCode.None) return true;
+                    else if (Input.GetKey(Plugin.instance.option.CraftKey.Value)) return true;
+                    else return false;
                 }
                 else { return isArtificer; }
-                    
+
             });
         }
-        
+
     }
 
 
@@ -1562,14 +1717,26 @@ class Plugin : BaseUnityPlugin
 
 
 
+    // TODO: 修好这个东西
+    // 喵的，我改了什么东西导致他有bug的
+    // 我真的想不明白，这个log他就不能告诉我是哪句话有问题吗
+    private void ZapCoil_Update(On.ZapCoil.orig_Update orig, ZapCoil self, bool eu)
+    {
+        try
+        {
+            orig(self, eu);
+        }
+        catch (Exception ex)
+        {
+            base.Logger.LogError(ex);
+        }
 
-
-
+    }
 
 
 
     // 被电不仅不会死，还会吃饱（？
-    private void ZapCoil_Update(ILContext il)
+    private void IL_ZapCoil_Update(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 182，还是那个劫持判定
@@ -1588,19 +1755,50 @@ class Plugin : BaseUnityPlugin
             {
                 if (physicalObj is Player && (physicalObj as Player).slugcatStats.name.value == SlugcatName)
                 {
+                    // 抄的蜈蚣代码
                     (physicalObj as Player).Stun(200);
+                    physicalObj.room.AddObject(new CreatureSpasmer(physicalObj as Player, false, (physicalObj as Player).stun));
+                    (physicalObj as Player).LoseAllGrasps();
                     if (PebblesSlugOption.AddFoodOnShock.Value)
                     {
                         int maxfood = (physicalObj as Player).MaxFoodInStomach;
                         int food = (physicalObj as Player).FoodInStomach;
-                        Log("food:" + food + " maxfood: " + maxfood);
-                        (physicalObj as Player).AddFood(maxfood - food);
+                        Log("Zapcoil - food:" + food + " maxfood: " + maxfood);
+                        CustomAddFood(physicalObj as Player, maxfood - food);
+                        // (physicalObj as Player).AddFood(maxfood - food);
                     }
                     return null;
                 }
                 else { return physicalObj; }
             });
         }
+
+        /*// 我测。为什么你要访问房间重力啊。
+        // 506 
+        // 怪不得没人做重力控制。。我真是踩着雷区了。。
+        ILCursor c2 = new ILCursor(il);
+        if (c2.TryGotoNext(MoveType.After,
+            (i) => i.Match(OpCodes.Callvirt),
+            (i) => i.Match(OpCodes.Brfalse_S),
+            (i) => i.MatchLdarg(0),
+            (i) => i.MatchLdarg(0),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.MatchLdarg(0),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Ldfld)
+            ))
+        {
+            Log("match! - zapcoil");
+            c2.Emit(OpCodes.Ldarg_0);
+            c2.EmitDelegate<Func<float, Room, float>>((gravity, room) =>
+            {
+                if (room!=null && room.game.session is StoryGameSession && room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+                {
+                    return 0f;
+                }
+                return gravity;
+            });
+        }*/
     }
 
 
@@ -1622,16 +1820,15 @@ class Plugin : BaseUnityPlugin
             (i) => i.Match(OpCodes.Call)
             ))
         {
-            Log("Match successfully! - CentipedeShock");
             c.Emit(OpCodes.Ldarg_1);
             c.EmitDelegate<Func<float, PhysicalObject, float>>((centipedeMass, physicalObj) =>
             {
                 Log("Match successfully! - CentipedeShock, centipede mass: "+ centipedeMass);
                 if (physicalObj is Player && (physicalObj as Player).slugcatStats.name.value == SlugcatName) 
                 {
-                    if (PebblesSlugOption.AddFoodOnShock.Value && (physicalObj as Player).FoodInStomach < (physicalObj as Player).MaxFoodInStomach)
+                    if (PebblesSlugOption.AddFoodOnShock.Value)
                     {
-                        (physicalObj as Player).AddFood(1);
+                        CustomAddFood(physicalObj as Player, 1);
                     }
                     return 0;
                 }

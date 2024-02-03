@@ -16,10 +16,8 @@ namespace PebblesSlug;
 
 
 
-// 重力控制：单独绑了个按键。这个功能刚玩会觉得很鸡肋，但我试了试，低重力让我能够飞行当中一矛命中蜥蜴身体，当场开饭。高重力让我随手召唤秃鹫，单矛随便杀。
-// 我开始理解fp为什么会说自己是神了。
-// 以后还是把他改成，解锁结局后才能全局操控重力吧。现在我先不改，太好玩了，我先玩
-// 特么的，出大问题。。
+// 重力控制：什么质量稀释电池，简直弱爆了好不好
+// 以后还是把他改成，解锁结局后才能全局操控重力，或者是直接禁用。现在我先不改，太好玩了，我先玩
 public class GravityController : UpdatableAndDeletable
 {
     public Player player;
@@ -34,12 +32,13 @@ public class GravityController : UpdatableAndDeletable
     private readonly bool loadRoomBefore = false;
     public Dictionary<RoomRealizer.RealizedRoomTracker, float> realizedRoomGravity;
     public bool isAbleToUse = false;
-
+    public bool lastRoomHasEffect = true;
+    public bool RoomHasEffect = true;
 
     public GravityController(Player player)
     {
         this.player = player;
-        unlocked = player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding;
+        unlocked = (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding) || Plugin.DevMode;
 
     }
 
@@ -48,19 +47,23 @@ public class GravityController : UpdatableAndDeletable
     public override void Update(bool eu)
     {
         // 这个房间我搞不定。SS_AI那里回头再单独写。。。
-        if (!enabled || player.room.abstractRoom.name == "SS_E08" || player.room.abstractRoom.name == "SS_AI") return;
-        // 回头在这里改成altEnding的判定。
-        if (!player.room.abstractRoom.name.StartsWith("SS") && !Plugin.GravityControlUnlock && !unlocked) return;
+        if (!enabled || player.room.abstractRoom.name == "SS_E08") return;
+        if (!player.room.abstractRoom.name.StartsWith("SS") && !unlocked) return;
 
         base.Update(eu);
+        // 哼哼啊啊啊啊啊啊啊啊
+        if (player.room.abstractRoom.name == "SS_AI")
+        {
+
+        }
         // 这就是我不懂了，他这儿的effect amount还不是真正的重力，他加了个插值，他为什么要加，我真是一点也想不明白，这除了导致我修三个小时bug以外还有什么别的用处吗
         // 但是他这重力效果和室内灯光还是绑定的，我既不能访问这个AntiGravity的实例，又不能直接把它删了，我真的谢
-        if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null)
+        else if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null)
         {
             if (gravityBonus != (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f))
             {
-                Plugin.Log("gravity mismatch IN ZEROG AREA");
-                Plugin.Log("-- room gravity: ", player.room.gravity);
+                Plugin.LogStat("gravity mismatch IN ZEROG AREA");
+                Plugin.LogStat("-- room gravity: ", player.room.gravity);
                 gravityBonus = (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f);
             }
         }
@@ -69,15 +72,15 @@ public class GravityController : UpdatableAndDeletable
             if (gravityBonus != (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f)
             && gravityBonus != (int)Mathf.Round(10f * 1f - player.room.gravity))
             {
-                Plugin.Log("gravity mismatch IN BROKEN ZEROG AREA");
-                Plugin.Log("-- room gravity: ", player.room.gravity);
+                Plugin.LogStat("gravity mismatch IN BROKEN ZEROG AREA");
+                Plugin.LogStat("-- room gravity: ", player.room.gravity);
                 gravityBonus = (int)Mathf.Round(10f * player.room.gravity);
             }
         }
         else if (gravityBonus != (int)Mathf.Round(10f * player.room.gravity))
         {
-            Plugin.Log("gravity mismatch or coop player changing gravity: ");
-            Plugin.Log("-- room gravity: ", player.room.gravity);
+            Plugin.LogStat("gravity mismatch or coop player changing gravity: ");
+            Plugin.LogStat("-- room gravity: ", player.room.gravity);
             gravityBonus = (int)Mathf.Round(10f * player.room.gravity);
         }
 
@@ -101,22 +104,27 @@ public class GravityController : UpdatableAndDeletable
                 if (gravityBonus >= 0)
                 {
 
-                    if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
+                    if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null || player.room.abstractRoom.name == "SS_AI")
                     {
-                        Plugin.Log("HAS GRAVITY EFFECT");
+                        Plugin.LogStat("HAS GRAVITY EFFECT");
                         // 如果有类似效果，由于我猜这两效果不能大于1，所以还得钳制范围
                         if (gravityBonus <= 10)
                         {
-                            player.room.gravity = 1f - Mathf.Lerp(0f, 0.85f, 1f - gravityBonus * 0.1f);
-                            // 找到并修改zeroG这个效果。roomeffects竟然没有一个能让我直接找到对应效果的函数，还得我自己写for循环……
-                            for (int i = 0; i < player.room.roomSettings.effects.Count; i++)
+                            if (player.room.abstractRoom.name == "SS_AI") { }
+                            else
                             {
-                                if (player.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG || player.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
+                                player.room.gravity = 1f - Mathf.Lerp(0f, 0.85f, 1f - gravityBonus * 0.1f);
+                                // 找到并修改zeroG这个效果。roomeffects竟然没有一个能让我直接找到对应效果的函数，还得我自己写for循环……
+                                for (int i = 0; i < player.room.roomSettings.effects.Count; i++)
                                 {
-                                    player.room.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                                    Plugin.Log("zeroG amount: ", player.room.roomSettings.effects[i].amount);
+                                    if (player.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG || player.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
+                                    {
+                                        player.room.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
+                                        Plugin.LogStat("zeroG amount: ", player.room.roomSettings.effects[i].amount);
+                                    }
                                 }
                             }
+                            
 
                         }
 
@@ -124,6 +132,7 @@ public class GravityController : UpdatableAndDeletable
 
                     }
                     // 由于颜色显示有上限，所以再加个钳制……
+                    // 没事了，颜色显示的方案失效了，我在想要不要把这个钳制去了，让闲的没事的人试试整个屏幕全是圆圈的感觉
                     else if (gravityBonus <= 80)
                     {
                         player.room.gravity = 0.1f * gravityBonus;
@@ -133,7 +142,7 @@ public class GravityController : UpdatableAndDeletable
                 }
                 else { gravityBonus = 0; }
 
-                Plugin.Log("player gravity control RESULT" + player.room.gravity);
+                Plugin.LogStat("player gravity control RESULT" + player.room.gravity);
                 gravityControlCounter = 0;
             }
         }
@@ -158,26 +167,26 @@ public class GravityController : UpdatableAndDeletable
             if (room.realizedRoom.roomSettings.GetEffectAmount(RoomSettings.RoomEffect.Type.ZeroG) != 1f
                 || room.realizedRoom.roomSettings.GetEffectAmount(RoomSettings.RoomEffect.Type.BrokenZeroG) != 1f)
             {
-                Plugin.Log("WARNING!!!!!!!   gravity effect != 1f");
+                Plugin.LogStat("WARNING!!!!!!!   gravity effect != 1f");
             }
             if (gravityBonus <= 10)
             {
                 room.realizedRoom.gravity = 0.1f * gravityBonus;
-                Plugin.Log("LoadRoomUpdate to: ", room.realizedRoom.gravity);
+                Plugin.LogStat("LoadRoomUpdate to: ", room.realizedRoom.gravity);
                 for (int i = 0; i < room.realizedRoom.roomSettings.effects.Count; i++)
                 {
                     if (room.realizedRoom.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG
                         || room.realizedRoom.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
                     {
                         room.realizedRoom.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                        Plugin.Log("LoadRoomUpdate has effect, amount:", amountZeroG, " -to- ", room.realizedRoom.roomSettings.effects[i].amount);
+                        Plugin.LogStat("LoadRoomUpdate has effect, amount:", amountZeroG, " -to- ", room.realizedRoom.roomSettings.effects[i].amount);
                         break;
                     }
                 }
             }
             else
             {
-                Plugin.Log("LoadRoomUpdate: gravityBonus out of range");
+                Plugin.LogStat("LoadRoomUpdate: gravityBonus out of range");
             }
 
         }
@@ -191,19 +200,28 @@ public class GravityController : UpdatableAndDeletable
 
     public void NewRoom()
     {
+        lastRoomHasEffect = RoomHasEffect;
         if (!enabled || !unlocked)
         {
-            if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
+            if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null || player.room.abstractRoom.name == "SS_AI")
             {
+                RoomHasEffect = true;
                 gravityBonus = (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f);
             }
-            else { gravityBonus = (int)Mathf.Round(10f * player.room.gravity); }
+            else 
+            { 
+                RoomHasEffect = false;
+                gravityBonus = (int)Mathf.Round(10f * player.room.gravity); 
+            }
             return;
         }
-        if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
+        if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null || player.room.abstractRoom.name == "SS_AI")
         {
+            RoomHasEffect = true;
             if (gravityBonus <= 10)
             {
+                // 防止从其他地方传送进五卵石内部的时候，由于携带了原本的重力而摔死
+                if (!lastRoomHasEffect || player.room.abstractRoom.name == "SS_AI") { return; }
                 player.room.gravity = 0.1f * gravityBonus;
                 // 找到并修改zeroG这个效果
                 bool z = false;
@@ -214,7 +232,7 @@ public class GravityController : UpdatableAndDeletable
                     {
                         amountZeroG = player.room.roomSettings.effects[i].amount;
                         player.room.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                        Plugin.Log("room effect set - newroom - z, amount:", amountZeroG, " -to- ", player.room.roomSettings.effects[i].amount);
+                        Plugin.LogStat("room effect set - newroom - z, amount:", amountZeroG, " -to- ", player.room.roomSettings.effects[i].amount);
                         z = true;
                         break;
                     }
@@ -222,24 +240,25 @@ public class GravityController : UpdatableAndDeletable
                     {
                         amountBrokenZeroG = player.room.roomSettings.effects[i].amount;
                         player.room.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                        Plugin.Log("room effect set - newroom - b, amount:", amountBrokenZeroG, " -to- ", player.room.roomSettings.effects[i].amount);
+                        Plugin.LogStat("room effect set - newroom - b, amount:", amountBrokenZeroG, " -to- ", player.room.roomSettings.effects[i].amount);
                         b = true;
                         break;
                     }
                 }
                 if (!z) amountZeroG = 0f;
                 if (!b) amountBrokenZeroG = 0f;
-                Plugin.Log("NewRoom ! z,b: ", amountZeroG, amountBrokenZeroG);
+                Plugin.LogStat("NewRoom ! z,b: ", amountZeroG, amountBrokenZeroG);
             }
             else
             {
-                Plugin.Log("gravityBonus out of range, cleared");
+                Plugin.LogStat("gravityBonus out of range, cleared");
                 gravityBonus = (int)Mathf.Round(10f * player.room.gravity);
             }
-
         }
         else
         {
+            RoomHasEffect = false;
+            if (lastRoomHasEffect) { return; }
             player.room.gravity = gravityBonus * 0.1f;
         }
     }
@@ -257,13 +276,13 @@ public class GravityController : UpdatableAndDeletable
                 {
                     // 我要摆烂了，现在这个地图上的重力应该不是0就是1罢（心虚）
                     player.room.roomSettings.effects[i].amount = loadRoomBefore ? 1f : amountZeroG;
-                    Plugin.Log("room effect set to original value because player died - ZeroG ", player.room.roomSettings.effects[i].amount);
+                    Plugin.LogStat("room effect set to original value because player died - ZeroG ", player.room.roomSettings.effects[i].amount);
                     break;
                 }
                 else if (player.room.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
                 {
                     player.room.roomSettings.effects[i].amount = loadRoomBefore ? 1f : amountBrokenZeroG;
-                    Plugin.Log("room effect set to original value because player died - BrokenZeroG ", player.room.roomSettings.effects[i].amount);
+                    Plugin.LogStat("room effect set to original value because player died - BrokenZeroG ", player.room.roomSettings.effects[i].amount);
                     break;
                 }
             }
@@ -272,7 +291,7 @@ public class GravityController : UpdatableAndDeletable
         {
             player.room.gravity = 1f;
             gravityBonus = 10;
-            Plugin.Log("gravity set to 1.0 because player died");
+            Plugin.LogStat("gravity set to 1.0 because player died");
         }
 
     }
@@ -293,7 +312,8 @@ public class GravityController : UpdatableAndDeletable
 
 
 
-
+// 这个东西其实不是很好看。首先我不会写那种丝滑的显示效果，我怕我一写他就坏掉。
+// 其次，我尝试过通过修改圆圈的颜色来区分不同的重力倍数，但他最后只会给我显示成黑白灰，我不知道为什么。
 public class GravityMeter : HudPart
 {
     private GravityController owner;
@@ -371,10 +391,11 @@ public class GravityMeter : HudPart
         int gravityInt = owner.gravityBonus % 10;
         int gravityLevel = owner.gravityBonus / 10;
         if (gravityLevel >= 7) gravityLevel = 7;
-        /*if (gravityLevel != 0 && gravityInt == 0)
+        if (owner.RoomHasEffect && gravityLevel != 0 && gravityInt == 0)
         {
+            gravityLevel--;
             gravityInt = 10;
-        }*/
+        }
 
         if (Show)
         {
@@ -389,11 +410,11 @@ public class GravityMeter : HudPart
 
         for (int i = 0; i < gravityInt; i++)
         {
-            circles[i].thickness = 5f;
+            circles[i].thickness = Math.Min(5f, circles[i].thickness + 1f);
         }
         for (int i = gravityInt; i < circles.Length; i++)
         {
-            circles[i].thickness = 1f;
+            circles[i].thickness = Math.Max(1f, circles[i].thickness - 1f);
         }
         for (int i = 0; i < circles.Length; i++)
         {

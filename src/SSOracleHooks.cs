@@ -25,6 +25,7 @@ using SlugBase.DataTypes;
 using MonoMod.RuntimeDetour;
 using System.Reflection;
 using SlugBase.SaveData;
+using static PebblesSlug.PlayerHooks;
 
 
 
@@ -43,7 +44,11 @@ internal class SSOracleHooks
     {
 
         On.SSOracleBehavior.ctor += SSOracleBehavior_ctor;
-        // On.Oracle.ctor += Oracle_ctor;
+        On.Oracle.ctor += Oracle_ctor;
+        On.SSOracleBehavior.SeePlayer += SSOracleBehavior_SeePlayer;
+        On.SSOracleBehavior.Update += SSOracleBehavior_Update;
+        On.Oracle.Destroy += Oracle_Destroy;
+        IL.SSOracleBehavior.Update += IL_SSOracleBehavior_Update;
         // IL.Oracle.ctor += IL_Oracle_ctor;
         // On.OracleGraphics.ctor += OracleGraphics_ctor;
 
@@ -52,6 +57,102 @@ internal class SSOracleHooks
             Oracle_Consious
             );
     }
+
+
+
+    // 防止fp修改房间重力
+    // tmd，这个为啥不生效啊（恼）这比东西也不输出日志，他到底想干嘛
+    private static void IL_SSOracleBehavior_Update(ILContext il)
+    {
+        // 2240 插入label
+        ILLabel label = null;
+        ILCursor c2 = new ILCursor(il);
+        if (c2.TryGotoNext(MoveType.After,
+            i => i.MatchLdfld<SSOracleBehavior>("currSubBehavior"),
+            i => i.Match(OpCodes.Callvirt),
+            i => i.MatchStfld<Room>("gravity")
+            ))
+        {
+            label = c2.MarkLabel();
+        }
+        else
+        {
+            Plugin.Log("!!! IL_SSOracleBehavior_Update not found !!!");
+        }
+
+        // 2241，执行判断
+        ILCursor c = new ILCursor(il);
+        if (c.TryGotoNext(MoveType.After,
+            i => i.MatchLdfld<SSOracleBehavior>("currSubBehavior"),
+            i => i.Match(OpCodes.Callvirt),
+            i => i.MatchStfld<Room>("gravity"),
+            i => i.Match(OpCodes.Ret)
+            ) && label != null)
+        {
+            c.Emit(OpCodes.Ldarg_0);
+            c.EmitDelegate<Func<SSOracleBehavior, bool>>((self) =>
+            {
+                bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+                if (getModule && module.console != null && module.console.isActive)
+                {
+                    Plugin.Log("return");
+                    return true;
+                }
+                return false;
+            });
+            c.Emit(OpCodes.Brtrue, label);
+        }
+
+    }
+
+
+
+
+    private static void SSOracleBehavior_Update(On.SSOracleBehavior.orig_Update orig, SSOracleBehavior self, bool eu)
+    {
+        orig(self, eu);
+        bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+        if (getModule) 
+        {
+            if (module.console != null && module.console.isActive)
+            {
+                module.console.Update(eu);
+            }
+            else if (module.console != null)
+            {
+                self.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
+            }
+
+            
+            // 没辙了，我要使用一个非常烂的办法
+            if (module.console.player != null)
+            {
+                bool getModulep = Plugin.playerModules.TryGetValue(module.console.player, out var modulep) && modulep.playerName == Plugin.SlugcatStatsName;
+                if (getModulep && modulep.gravityController.isAbleToUse)
+                {
+                    self.getToWorking = 1 - modulep.gravityController.gravityBonus * 0.1f;
+                }
+            }
+            
+        }
+        
+    }
+
+
+
+
+
+    // 
+    private static void SSOracleBehavior_SeePlayer(On.SSOracleBehavior.orig_SeePlayer orig, SSOracleBehavior self)
+    {
+        bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+        if (getModule) return;
+        else { orig(self); }
+    }
+
+
+
+
 
 
 
@@ -80,68 +181,38 @@ internal class SSOracleHooks
 
 
 
-
+    // 在这里挂模组（万物起源，如果有问题就关它
     private static void Oracle_ctor(On.Oracle.orig_ctor orig, Oracle self, AbstractPhysicalObject abstractPhysicalObject, Room room) 
     {
         orig(self, abstractPhysicalObject, room);
         if (self.room.game.session is StoryGameSession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
         {
-            if (self.room.abstractRoom.name.StartsWith("SS") && self.room.abstractRoom.name != "SS_AI")
+            if (self.ID == Oracle.OracleID.SS)
             {
-                self.ID = Plugin.oracleID;
-                self.oracleBehavior = new OracleBehavior(self);
+                Plugin.oracleModules.Add(self, new OracleModule(self));
             }
         }
         
 
     }
 
-    // 这个东西不知道为啥，不太好使。要不还是算了。
-    private static void IL_Oracle_ctor(ILContext il)
+
+
+
+
+    // 垃圾回收
+    private static void Oracle_Destroy(On.Oracle.orig_Destroy orig, Oracle self)
     {
-        ILCursor c = new(il);
-        if (c.TryGotoNext(MoveType.After,
-            i => i.Match(OpCodes.Call),
-            i => i.Match(OpCodes.Brtrue_S),
-            i => i.Match(OpCodes.Ldsfld),
-            i => i.Match(OpCodes.Br_S),
-            i => i.Match(OpCodes.Ldsfld)
-            // i => i.MatchLdsfld<Oracle.OracleID>("SS")
-            ))
+        if (self.ID == Oracle.OracleID.SS) 
         {
-            Plugin.Log("match successfully! - IL_Oracle_ctor");
-            c.Emit(OpCodes.Ldarg_2);
-            c.EmitDelegate<Func<Oracle.OracleID, Room, Oracle.OracleID>>((oracleID, room) =>
+            bool getModule = Plugin.oracleModules.TryGetValue(self, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+            if (getModule)
             {
-                if (room.game.session is StoryGameSession && room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && room.abstractRoom.name.StartsWith("SS") && room.abstractRoom.name != "SS_AI")
-                    return Plugin.oracleID;
-                return oracleID;
-            });
+                module.console.Destroy();
+                module.console = null;
+            }
         }
     }
-
-
-
-
-
-    private static void OracleGraphics_ctor(On.OracleGraphics.orig_ctor orig, OracleGraphics self, PhysicalObject ow)
-    {
-        if (ow is Player && (ow as Player).slugcatStats.name == Plugin.SlugcatStatsName)
-        {
-            Random.State state = Random.state;
-            Random.InitState(56);
-            self.totalSprites = 0;
-
-            self.halo = new OracleGraphics.Halo(self, self.totalSprites);
-            self.totalSprites += self.halo.totalSprites;
-            
-            Random.state = state;
-            return;
-        }
-        orig(self, ow);
-    }
-
-
 
 
 

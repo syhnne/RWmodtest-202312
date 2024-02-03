@@ -1,6 +1,6 @@
 {
 	"id": "PebblesSlug",
-	"name": "PebblesSlug",
+	"name": "Pebbles Slugcat",
 	"description": "啊，我的眼睛（揉眼睛）",
 	"expedition_description": "别打冒险模式，我不知道这里面藏着多少bug",
 
@@ -42,7 +42,7 @@
 		"cycle_length_min": 9,
 
 		"guide_overseer": 0,
-		"start_room": "CC_A02",
+		"start_room": "OE_SEXTRA",
 		"timeline_after": "Red",
 		"world_state": [ "PebblesSlug", "Red" ],
 		"diet": {
@@ -57,7 +57,7 @@
 		},
 		"alignments": {
 			"Scavengers": { "like": -0.9 },
-			"lizards": { "like": -0.3 }
+			"lizards": { "like": -0.9 }
 		}
 	}
 

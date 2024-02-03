@@ -25,6 +25,7 @@ using MonoMod.RuntimeDetour;
 using System.Reflection;
 using SlugBase.SaveData;
 using SlugBase;
+using System.Runtime.InteropServices;
 
 
 
@@ -53,6 +54,7 @@ internal class PlayerHooks
     {
         // On.RainWorld.Update += RainWorld_Update;
         On.HUD.HUD.InitSinglePlayerHud += HUD_InitSinglePlayerHud;
+        On.Player.MovementUpdate += Player_MovementUpdate;
         // On.RoomCamera.FireUpSinglePlayerHUD += RoomCamera_FireUpSinglePlayerHUD;
     }
 
@@ -66,8 +68,9 @@ internal class PlayerHooks
         internal readonly SlugcatStats.Name storyName;
         internal readonly bool isPebbles;
 
-        internal bool movementInputOnly = false;
-        
+        public bool lockInput = false;
+
+        internal SSOracleConsole console;
         internal GravityController gravityController;
 
 
@@ -98,8 +101,26 @@ internal class PlayerHooks
                 
         }
 
+
+
+
+
+
+
+
+
+
         public void Update(Player player, bool eu)
         {
+            if (console != null && player.room.abstractRoom.name == "SS_AI"
+                && Input.GetKeyDown(Plugin.instance.option.fpConsoleKey.Value))
+            {
+                console.isActive = !console.isActive;
+                // 没想好怎么让他移动，先不关这个了
+                // lockInput = console.isActive;
+                
+                Plugin.Log("toggle console active: ", console.isActive);
+            }
 
         }
 
@@ -111,7 +132,26 @@ internal class PlayerHooks
 
 
 
-    // 重力显示
+    // 启用控制台时阻止玩家输入
+    private static void Player_MovementUpdate(On.Player.orig_MovementUpdate orig, Player self, bool eu)
+    {
+        bool getModule = Plugin.playerModules.TryGetValue(self, out var module) && module.playerName == Plugin.SlugcatStatsName;
+        if (getModule && module.lockInput)
+        {
+            self.input[0] = new Player.InputPackage();
+        }
+        orig(self, eu);
+    }
+
+
+
+
+
+
+
+
+
+    // 各种hud
     private static void HUD_InitSinglePlayerHud(On.HUD.HUD.orig_InitSinglePlayerHud orig, HUD.HUD self, RoomCamera cam)
     {
         orig(self, cam);
@@ -123,6 +163,8 @@ internal class PlayerHooks
                 Plugin.Log("HUD add part");
                 self.AddPart(new GravityMeter(self, self.fContainers[1], module.gravityController));
             }
+            // 没办法了，这是一种让我在SS_AI房间加载出来的时候也能访问到hud的阴招
+            Plugin.instance.Hud = self;
 
         }
 
@@ -136,30 +178,6 @@ internal class PlayerHooks
 
 
 
-    private static void RainWorld_Update(On.RainWorld.orig_Update orig, RainWorld self)
-    {
-        RainWorldGame rainWorldGame = self.processManager.currentMainLoop as RainWorldGame;
-        if (rainWorldGame != null && rainWorldGame.pauseMenu == null && self.processManager.upcomingProcess == null && rainWorldGame.Players.Count > 0 && rainWorldGame.session is StoryGameSession && rainWorldGame.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
-        {
-            Player player;
-            for (int i = 0; i< rainWorldGame.Players.Count; i++)
-            {
-                Creature creature = rainWorldGame.Players[i].realizedCreature;
-                if (creature is Player && (creature as Player).slugcatStats.name == Plugin.SlugcatStatsName) { player = creature as Player; }
-            }
-
-            // bool keyDown = Input.GetKeyDown();
-        }
-
-
-    }
-
-
-    private static void Player_checkInput(On.Player.orig_checkInput orig, Player self)
-    {
-        orig(self);
-
-    }
 
 
 }
