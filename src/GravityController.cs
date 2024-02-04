@@ -52,9 +52,9 @@ public class GravityController : UpdatableAndDeletable
 
         base.Update(eu);
         // 哼哼啊啊啊啊啊啊啊啊
-        if (player.room.abstractRoom.name == "SS_AI")
+        if (player.room.abstractRoom.name == "SS_AI" || player.room.abstractRoom.name == "SS_A03")
         {
-
+            // 这个房间太特么难做了。。实不相瞒，写完我都不记得自己到底改了夺少东西
         }
         // 这就是我不懂了，他这儿的effect amount还不是真正的重力，他加了个插值，他为什么要加，我真是一点也想不明白，这除了导致我修三个小时bug以外还有什么别的用处吗
         // 但是他这重力效果和室内灯光还是绑定的，我既不能访问这个AntiGravity的实例，又不能直接把它删了，我真的谢
@@ -69,6 +69,7 @@ public class GravityController : UpdatableAndDeletable
         }
         else if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
         {
+            // TODO: 这个有的时候不好使 SS_D05
             if (gravityBonus != (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f)
             && gravityBonus != (int)Mathf.Round(10f * 1f - player.room.gravity))
             {
@@ -132,7 +133,7 @@ public class GravityController : UpdatableAndDeletable
 
                     }
                     // 由于颜色显示有上限，所以再加个钳制……
-                    // 没事了，颜色显示的方案失效了，我在想要不要把这个钳制去了，让闲的没事的人试试整个屏幕全是圆圈的感觉
+                    // 没事了，颜色显示的方案失效了，我在想要不要把这个钳制去了，让闲的没事的人把重力改到100，然后因为下台阶而摔死
                     else if (gravityBonus <= 80)
                     {
                         player.room.gravity = 0.1f * gravityBonus;
@@ -156,47 +157,6 @@ public class GravityController : UpdatableAndDeletable
     }
 
 
-    public void LoadRoomUpdate(AbstractRoom room)
-    {
-        if (!enabled || !loadRoomBefore || !unlocked || room.realizedRoom == null) return;
-
-        if (room.realizedRoom.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null
-            || room.realizedRoom.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
-        {
-            // 这部分我不是很懂了，因为我懒得写存储。不是1的我可就不管了（目移
-            if (room.realizedRoom.roomSettings.GetEffectAmount(RoomSettings.RoomEffect.Type.ZeroG) != 1f
-                || room.realizedRoom.roomSettings.GetEffectAmount(RoomSettings.RoomEffect.Type.BrokenZeroG) != 1f)
-            {
-                Plugin.LogStat("WARNING!!!!!!!   gravity effect != 1f");
-            }
-            if (gravityBonus <= 10)
-            {
-                room.realizedRoom.gravity = 0.1f * gravityBonus;
-                Plugin.LogStat("LoadRoomUpdate to: ", room.realizedRoom.gravity);
-                for (int i = 0; i < room.realizedRoom.roomSettings.effects.Count; i++)
-                {
-                    if (room.realizedRoom.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.ZeroG
-                        || room.realizedRoom.roomSettings.effects[i].type == RoomSettings.RoomEffect.Type.BrokenZeroG)
-                    {
-                        room.realizedRoom.roomSettings.effects[i].amount = 0.1f * (10 - gravityBonus);
-                        Plugin.LogStat("LoadRoomUpdate has effect, amount:", amountZeroG, " -to- ", room.realizedRoom.roomSettings.effects[i].amount);
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                Plugin.LogStat("LoadRoomUpdate: gravityBonus out of range");
-            }
-
-        }
-        else
-        {
-            room.realizedRoom.gravity = gravityBonus * 0.1f;
-        }
-    }
-
-
 
     public void NewRoom()
     {
@@ -215,7 +175,20 @@ public class GravityController : UpdatableAndDeletable
             }
             return;
         }
-        if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null || player.room.abstractRoom.name == "SS_AI")
+        else if (player.room.abstractRoom.name == "SS_AI" && player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding != true)
+        {
+            // 这里不能直接修改重力，只能修改bonus，让SSOracleBehavior_SubBehavior_lowGravity来读这个
+            RoomHasEffect = true;
+            gravityBonus = 10;
+        }
+        else if (player.room.abstractRoom.name == "SS_A03")
+        {
+            // 怕了怕了 大哥 别崩我游戏
+            RoomHasEffect = true;
+            gravityBonus = 0;
+            return;
+        }
+        else if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null || player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null || player.room.abstractRoom.name == "SS_AI")
         {
             RoomHasEffect = true;
             if (gravityBonus <= 10)
@@ -261,6 +234,8 @@ public class GravityController : UpdatableAndDeletable
             if (lastRoomHasEffect) { return; }
             player.room.gravity = gravityBonus * 0.1f;
         }
+
+
     }
 
 
@@ -312,6 +287,12 @@ public class GravityController : UpdatableAndDeletable
 
 
 
+
+
+
+
+
+
 // 这个东西其实不是很好看。首先我不会写那种丝滑的显示效果，我怕我一写他就坏掉。
 // 其次，我尝试过通过修改圆圈的颜色来区分不同的重力倍数，但他最后只会给我显示成黑白灰，我不知道为什么。
 public class GravityMeter : HudPart
@@ -358,7 +339,7 @@ public class GravityMeter : HudPart
         {
             rows[i] = new HUDCircle(hud, HUDCircle.SnapToGraphic.smallEmptyCircle, fContainer, 0);
             rows[i].sprite.isVisible = true;
-            rows[i].rad = 40f + (float)i * 3f;
+            rows[i].rad = 40f + (float)i * 4f + i;
             rows[i].thickness = 1f;
             rows[i].visible = true;
             rows[i].pos = owner.player.mainBodyChunk.pos - Vector2.zero;
@@ -390,7 +371,7 @@ public class GravityMeter : HudPart
         pos = owner.player.mainBodyChunk.pos - vector;
         int gravityInt = owner.gravityBonus % 10;
         int gravityLevel = owner.gravityBonus / 10;
-        if (gravityLevel >= 7) gravityLevel = 7;
+        // if (gravityLevel >= 7) gravityLevel = 7;
         if (owner.RoomHasEffect && gravityLevel != 0 && gravityInt == 0)
         {
             gravityLevel--;
@@ -410,11 +391,13 @@ public class GravityMeter : HudPart
 
         for (int i = 0; i < gravityInt; i++)
         {
-            circles[i].thickness = Math.Min(5f, circles[i].thickness + 1f);
+            circles[i].thickness = Math.Min(5f, circles[i].thickness + 0.333333335f);
+            circles[i].rad = Math.Max(3f, circles[i].rad - 0.1f);
         }
         for (int i = gravityInt; i < circles.Length; i++)
         {
-            circles[i].thickness = Math.Max(1f, circles[i].thickness - 1f);
+            circles[i].thickness = Math.Max(1f, circles[i].thickness - 0.333333335f);
+            circles[i].rad = Math.Min(4f, circles[i].rad + 0.1f);
         }
         for (int i = 0; i < circles.Length; i++)
         {

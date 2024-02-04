@@ -31,6 +31,7 @@ using System.Runtime.InteropServices;
 using static MonoMod.InlineRT.MonoModRule;
 using System.Runtime.CompilerServices;
 using IL.Menu;
+using HUD;
 
 
 
@@ -80,7 +81,6 @@ class Plugin : BaseUnityPlugin
     internal static readonly Oracle.OracleID oracleID = new Oracle.OracleID("PL");
     internal static readonly bool ShowLogs = true;
     internal static Plugin instance;
-    internal HUD.HUD Hud;
     // 以防我测试的时候不能使用一些功能，发布的时候就改成false
     public static bool DevMode = true;
 
@@ -117,18 +117,20 @@ class Plugin : BaseUnityPlugin
             option = new PebblesSlugOption();
             instance = this;
 
-            CustomLore.Apply();
-            SSOracleHooks.Apply();
-            PlayerHooks.Apply();
+            
 
 
             On.RainWorld.OnModsInit += Extras.WrapInit(LoadResources);
+
+            CustomLore.Apply();
+            SSOracleHooks.Apply();
+            PlayerHooks.Apply();
 
             On.Player.ClassMechanicsArtificer += Player_ClassMechanicsArtificer;
             On.Player.CraftingResults += Player_CraftingResults;
             On.Player.GraspsCanBeCrafted += Player_GraspsCanBeCrafted;
             // On.Player.SwallowObject += Player_SwallowObject;
-            On.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject_old;
+            On.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject;
             IL.Player.GrabUpdate += Player_GrabUpdate;
             On.Creature.Violence += Creature_Violence;
             On.Player.CanBeSwallowed += Player_CanBeSwallowed;
@@ -149,6 +151,7 @@ class Plugin : BaseUnityPlugin
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
             IL.ZapCoil.Update += IL_ZapCoil_Update;
             On.ZapCoil.Update += ZapCoil_Update;
+            // On.GravityDisruptor.Update += GravityDisruptor_Update;
             IL.Centipede.Shock += Centipede_Shock;
 
 
@@ -900,6 +903,32 @@ class Plugin : BaseUnityPlugin
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+
+    // 这才是设定上真正修改重力的家伙
+    // 卧槽，他卡bug
+    private void GravityDisruptor_Update(On.GravityDisruptor.orig_Update orig, GravityDisruptor self, bool eu)
+    {
+        try
+        {
+            orig(self, eu);
+            if (self.room != null && self.room.game != null
+                && self.room.game.session is StoryGameSession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName
+                && self.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) == null)
+            {
+                self.power = 1f - self.room.gravity;
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e);
+        }
+    }
+
+
+
+
+
+
     // 还是那个不能吃神经元
     private bool Player_ObjectCountsAsFood(On.Player.orig_ObjectCountsAsFood orig, Player self, PhysicalObject obj)
     {
@@ -943,6 +972,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 能进大都会
+    // 其实这个方法有点简陋了，只是我找不到那种无条件的门应该怎么写
     private void RegionGate_customKarmaGateRequirements(On.RegionGate.orig_customKarmaGateRequirements orig, RegionGate self)
     {
         orig(self);
@@ -959,29 +989,6 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void RoomRealizer_Update(On.RoomRealizer.orig_Update orig, RoomRealizer self)
-    {
-        orig(self);
-        foreach (RoomRealizer.RealizedRoomTracker tracker in self.realizedRooms)
-        {
-            if (tracker.room.realizedRoom == null) return;
-            Log("realized room: ", tracker.room.name, "gravity: ", tracker.room.realizedRoom.gravity);
-            // 对喽 就是他 他这里有所有我需要修改重力的房间
-            // 坏了 这儿够不到player实例
-            
-        }
-    }
-
-
-    private void RoomPreparer_Update(On.RoomPreparer.orig_Update orig, RoomPreparer self)
-    {
-        orig(self);
-        Log("RoomPreparer_Update, room: ", self.room.abstractRoom.name);
-    }
-
-
-
-
 
 
 
@@ -993,6 +1000,7 @@ class Plugin : BaseUnityPlugin
         if (getModule)
         {
             module.gravityController?.Destroy();
+            module.gravityController = null;
         }
         orig(self);
     }
@@ -1023,10 +1031,17 @@ class Plugin : BaseUnityPlugin
         bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
         if (getModule && self.slugcatStats.name == SlugcatStatsName)
         {
-            module.gravityController.NewRoom();
-            if (self.room.abstractRoom.name != "SS_AI")
+            module.gravityController?.NewRoom();
+            if (self.room != null && module.console != null && self.room.abstractRoom.name != "SS_AI")
             {
                 module.console.isActive = false;
+            }
+        }
+        if (self.room != null && self.room.game.cameras != null && self.room.game.cameras[0].hud != null)
+        {
+            foreach (HudPart hudPart in self.room.game.cameras[0].hud.parts)
+            {
+                LogStat("hudPart: ", hudPart.ToString());
             }
         }
     }
@@ -1513,48 +1528,28 @@ class Plugin : BaseUnityPlugin
 
 
 
-    private void Player_SpitUpCraftedObject(ILContext il)
-    {
-        ILCursor c = new(il);
-        // 37 劫持炸矛判定，在此判定电矛。所以有没有人告诉我match到底该怎么写，我不想写这么大一坨，很累的
-        if (c.TryGotoNext(MoveType.After,
-            (i) => i.Match(OpCodes.Call),
-            (i) => i.Match(OpCodes.Brfalse),
-            (i) => i.MatchLdloc(2),
-            (i) => i.Match(OpCodes.Isinst),
-            (i) => i.Match(OpCodes.Ldfld)
-            ))
-        {
-            Log("Match successfully! - Player_SpitUpCraftedObject");
-        }
-    }
 
 
 
 
-
-
-
-    private void Player_SpitUpCraftedObject_old(On.Player.orig_SpitUpCraftedObject orig, Player self)
+    private void Player_SpitUpCraftedObject(On.Player.orig_SpitUpCraftedObject orig, Player self)
     {
         if (self.slugcatStats.name.value == SlugcatName)
         {
-            // 表示玩家在房间中位置的Vector2（二维向量）实例
             var vector = self.mainBodyChunk.pos;
 
-            // 我要写一个craftingtutorial，并且单独绑一个变量，因为它内容跟原来的不一样
+            // TODO: 我要写一个craftingtutorial，并且单独绑一个变量，因为它内容跟原来的不一样
             self.room.PlaySound(SoundID.Slugcat_Swallow_Item, self.mainBodyChunk);
 
             for (int i = 0; i < self.grasps.Length; i++)
             {
                 if (self.grasps[i] != null)
                 {
-                    AbstractPhysicalObject abstractPhysicalObject = self.grasps[i].grabbed.abstractPhysicalObject;
-                    // 这应该是具体的生成规则，我不知道这里有没有bug。。他完全没说把什么矛合成什么矛，这些东西都是分开的，放在不同的函数里的。
-                    // 错误的，他做炸矛的时候压根没调用这个函数，给我cpu干烧了。他是哪一步做出来的？？
-                    if (abstractPhysicalObject.type == AbstractPhysicalObject.AbstractObjectType.Spear)
+                    AbstractPhysicalObject grabbed = self.grasps[i].grabbed.abstractPhysicalObject;
+                    if (grabbed is AbstractSpear)
                     {
-                        if ((abstractPhysicalObject as AbstractSpear).explosive)
+                        AbstractSpear spear = grabbed as AbstractSpear;
+                        if (spear.explosive)
                         {
                             ExplosiveSpear explosiveSpear = self.grasps[i].grabbed as ExplosiveSpear;
                             self.room.AddObject(new SootMark(self.room, vector, 50f, false));
@@ -1598,22 +1593,20 @@ class Plugin : BaseUnityPlugin
                             explosiveSpear.room.InGameNoise(new InGameNoise(vector, 8000f, explosiveSpear, 1f));
                             explosiveSpear.Destroy();
                         }
-                        else if (PebblesSlugOption.AddFoodOnShock.Value && (abstractPhysicalObject as AbstractSpear).electric && (abstractPhysicalObject as AbstractSpear).electricCharge > 0)
+                        // 好了，谁能告诉我拿着有电的电矛的时候吐了两格是什么情况
+                        else if (PebblesSlugOption.AddFoodOnShock.Value && spear.electric && spear.electricCharge > 0)
                         {
                             // 其实电矛是一种用来储存食物的工具（大雾
-                            ElectricSpear electricSpear = (self.grasps[i].grabbed) as ElectricSpear;
                             // 绕过香菇病的一种加食物方法
-                            // 喵的，这东西会卡bug
-                            /*(self.abstractCreature.world.game.Players[0].state as PlayerState).foodInStomach += Math.Min(2, (abstractPhysicalObject as AbstractSpear).electricCharge);*/
-                            // self.AddFood(Math.Min(2, (abstractPhysicalObject as AbstractSpear).electricCharge));
-                            CustomAddFood(self, (abstractPhysicalObject as AbstractSpear).electricCharge);
-                            electricSpear.abstractSpear.electricCharge = 0;
+                            Log("HOLDING ELECTRIC SPEAR");
+                            CustomAddFood(self, spear.electricCharge);
+                            spear.electricCharge = 0;
                         }
                         else
                         {
                             self.ReleaseGrasp(i);
-                            abstractPhysicalObject.realizedObject.RemoveFromRoom();
-                            self.room.abstractRoom.RemoveEntity(abstractPhysicalObject);
+                            grabbed.realizedObject.RemoveFromRoom();
+                            self.room.abstractRoom.RemoveEntity(grabbed);
                             // 对了，生成矛是这个。。我可能是那个眼瞎。。
                             self.SubtractFood(2);
                             AbstractSpear abstractSpear = new AbstractSpear(self.room.world, null, self.abstractCreature.pos, self.room.game.GetNewID(), false, true);
@@ -1728,7 +1721,7 @@ class Plugin : BaseUnityPlugin
         }
         catch (Exception ex)
         {
-            base.Logger.LogError(ex);
+            // base.Logger.LogError(ex);
         }
 
     }

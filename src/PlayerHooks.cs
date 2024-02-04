@@ -54,7 +54,12 @@ internal class PlayerHooks
     {
         // On.RainWorld.Update += RainWorld_Update;
         On.HUD.HUD.InitSinglePlayerHud += HUD_InitSinglePlayerHud;
-        On.Player.MovementUpdate += Player_MovementUpdate;
+
+
+        // 禁止玩家输入
+        // On.Player.MovementUpdate += Player_MovementUpdate;
+
+
         // On.RoomCamera.FireUpSinglePlayerHUD += RoomCamera_FireUpSinglePlayerHUD;
     }
 
@@ -92,11 +97,8 @@ internal class PlayerHooks
             }
             if (isPebbles)
             {
-                Plugin.Log("playermodule!");
-                
-                // oracle = new Oracle(new AbstractPhysicalObject(player.room.world, AbstractPhysicalObject.AbstractObjectType.Oracle, null, new WorldCoordinate(player.room.abstractRoom.index, 15, 15, -1), player.room.game.GetNewID()), player.room);
-                // player.room.AddObject(oracle);
-                // oracleGraphics = new OracleGraphics(player);
+                Plugin.LogStat("playermodule added!");
+
             }
                 
         }
@@ -109,17 +111,17 @@ internal class PlayerHooks
 
 
 
-
+        // 启用控制台
         public void Update(Player player, bool eu)
         {
-            if (console != null && player.room.abstractRoom.name == "SS_AI"
+            if (console != null && player.room.abstractRoom.name == "SS_AI" && player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding
                 && Input.GetKeyDown(Plugin.instance.option.fpConsoleKey.Value))
             {
                 console.isActive = !console.isActive;
                 // 没想好怎么让他移动，先不关这个了
                 // lockInput = console.isActive;
                 
-                Plugin.Log("toggle console active: ", console.isActive);
+                Plugin.LogStat("toggle console active: ", console.isActive);
             }
 
         }
@@ -160,11 +162,11 @@ internal class PlayerHooks
             bool getModule = Plugin.playerModules.TryGetValue((self.owner as Player), out var module) && module.playerName == Plugin.SlugcatStatsName;
             if (getModule)
             {
-                Plugin.Log("HUD add part");
+                Plugin.LogStat("HUD add GravityMeter");
                 self.AddPart(new GravityMeter(self, self.fContainers[1], module.gravityController));
             }
             // 没办法了，这是一种让我在SS_AI房间加载出来的时候也能访问到hud的阴招
-            Plugin.instance.Hud = self;
+            // Plugin.instance.Hud = self;
 
         }
 

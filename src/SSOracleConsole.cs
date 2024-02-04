@@ -72,10 +72,8 @@ public class SSOracleConsole : UpdatableAndDeletable
 
     public override void Update(bool eu)
     {
-        if (player == null || player.room == null || !isActive || player.room.abstractRoom.name != "SS_AI") return;
-        base.Update(eu);
-        behavior.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
-        behavior.floatyMovement = false;
+        // 离开房间自动关闭在Player_NewRoom那里
+        if (player == null || player.room == null || player.room.abstractRoom.name != "SS_AI") return;
         Vector2 vector = Vector2.zero;
         if (oracle.room != null)
         {
@@ -83,6 +81,19 @@ public class SSOracleConsole : UpdatableAndDeletable
             vector.x += 170;
         }
         destination = player.mainBodyChunk.pos - vector;
+        if (!isActive) 
+        {
+            behavior.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
+            return; 
+        }
+
+
+
+
+        base.Update(eu);
+        behavior.movementBehavior = SSOracleBehavior.MovementBehavior.Idle;
+        behavior.floatyMovement = false;
+       
         behavior.SetNewDestination(destination);
         behavior.currentGetTo = destination;
         behavior.lookPoint = destination;
@@ -103,14 +114,7 @@ public class SSOracleConsole : UpdatableAndDeletable
 
 
 
-    // 纯属复制游戏代码，巧的，除了把private改成public之外一个字都没改
-    public Vector2 ClampVectorInRoom(Vector2 v)
-    {
-        Vector2 vector = v;
-        vector.x = Mathf.Clamp(vector.x, this.oracle.arm.cornerPositions[0].x + 10f, this.oracle.arm.cornerPositions[1].x - 10f);
-        vector.y = Mathf.Clamp(vector.y, this.oracle.arm.cornerPositions[2].y + 10f, this.oracle.arm.cornerPositions[1].y - 10f);
-        return vector;
-    }
+
 
 
 
@@ -132,9 +136,25 @@ public class SSOracleConsole : UpdatableAndDeletable
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 public class SSOracleConsoleHUD : HudPart
 {
-    private SSOracleConsole owner;
+    private readonly SSOracleConsole owner;
     private HUDCircle dstCircle;
     public float fade;
     public float lastFade;
@@ -145,11 +165,12 @@ public class SSOracleConsoleHUD : HudPart
     {
         this.owner = owner;
         owner.hud = this;
-        dstCircle = new HUDCircle(hud, HUDCircle.SnapToGraphic.smallEmptyCircle, fContainer, 0);
-        dstCircle.visible = Plugin.DevMode;
-        dstCircle.fade = 1f;
-        dstCircle.rad = 20f;
-        dstCircle.thickness = 2f;
+        dstCircle = new HUDCircle(hud, HUDCircle.SnapToGraphic.smallEmptyCircle, fContainer, 0)
+        {
+            visible = true,
+            rad = 40f,
+            thickness = 2f
+        };
         dstCircle.sprite.isVisible = true;
     }
 
@@ -164,29 +185,30 @@ public class SSOracleConsoleHUD : HudPart
 
     public override void Update()
     {
-        if (owner == null || !owner.isActive) return;
+        if (owner == null) return;
         base.Update();
         lastPos = pos;
         lastFade = fade;
-
-
-        // 做完player input manager之后，获取owner的输入
-
-
+        if (Show)
+        {
+            fade = Mathf.Min(1f, fade + 0.066666666f);
+        }
+        else
+        {
+            fade = Mathf.Max(0f, fade - 0.1f);
+        }
         dstCircle.Update();
-        dstCircle.visible = Show;
+        dstCircle.fade = fade;
         dstCircle.pos = owner.destination;
         dstCircle.pos.x += 170;
-        dstCircle.fade = 1f;
-        dstCircle.rad = 20f;
-        dstCircle.thickness = 2f;
+        
     }
 
 
     public override void Draw(float timeStacker)
     {
         if (hud.rainWorld.processManager.currentMainLoop is not RainWorldGame) return;
-        if (owner == null || !owner.isActive) return;
+        if (owner == null) return;
         dstCircle.Draw(timeStacker);
     }
 
@@ -195,6 +217,13 @@ public class SSOracleConsoleHUD : HudPart
         return Vector2.Lerp(lastPos, pos, timeStacker);
     }
 
+
+
+    public override void ClearSprites()
+    {
+        base.ClearSprites();
+        dstCircle = null;
+    }
 
 }
 
@@ -224,10 +253,10 @@ public class OracleModule
     {
         oracleRef = new WeakReference<Oracle>(oracle);
         console = new SSOracleConsole(oracle);
-        if (Plugin.instance != null && Plugin.instance.Hud != null)
+        if (console != null && oracle.room.world.game != null && oracle.room.world.game.cameras != null && oracle.room.world.game.cameras[0].hud != null)
         {
-            Plugin.instance.Hud.AddPart(new SSOracleConsoleHUD(Plugin.instance.Hud, Plugin.instance.Hud.fContainers[1], console));
-            Plugin.Log("oracleconsole HUD added successfully!!!");
+            oracle.room.world.game.cameras[0].hud.AddPart(new SSOracleConsoleHUD(oracle.room.world.game.cameras[0].hud, oracle.room.world.game.cameras[0].hud.fContainers[1], console));
+            Plugin.Log("oracleconsole HUD owner: ", oracle.room.world.game.cameras[0].hud.owner);
         }
         else { Plugin.Log("oracleconsole HUD NOT FOUND !!!"); }
 
