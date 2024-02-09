@@ -16,6 +16,9 @@ using MonoMod.Cil;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Menu;
+using System.IO;
+using System.Security.Cryptography;
+using UnityEngine.Rendering;
 
 
 
@@ -25,11 +28,14 @@ namespace PebblesSlug;
 
 
 
-internal class CustomLore
+public class CustomLore
 {
 
 
-    internal static void Apply()
+    static MenuScene.SceneID altEndingScene = new MenuScene.SceneID("AltEnding_PebblesSlug");
+
+
+    public static void Apply()
     {
 
         On.RainWorldGame.Win += RainWorldGame_Win;
@@ -41,20 +47,92 @@ internal class CustomLore
         // On.Menu.SlugcatSelectMenu.MineForSaveData += Menu_SlugcatSelectMenu_MineForSaveData;
 
 
-        // 防止玩家归乡，发布的时候记得取消注释
-        // On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.Update += MSCRoomSpecificScript_GourmandEnding_Update;
+        On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.Update += MSCRoomSpecificScript_GourmandEnding_Update;
+
 
 
         IL.SaveState.LoadGame += SaveState_LoadGame;
         On.RainWorldGame.GoToRedsGameOver += RainWorldGame_GoToRedsGameOver;
         On.RainWorldGame.BeatGameMode += RainWorldGame_BeatGameMode;
-        // On.Room.Loaded += Room_Loaded;
+        On.Room.Loaded += Room_Loaded;
+
+
+        On.Menu.SlugcatSelectMenu.SlugcatPage.AddAltEndingImage += SlugcatPage_AddAltEndingImage;
+        // On.Menu.MenuScene.BuildScene += MenuScene_BuildScene;
+    }
+
+
+
+
+
+
+
+
+    private static void SlideShow_ctor(On.Menu.SlideShow.orig_ctor orig, Menu.SlideShow self, ProcessManager manager, Menu.SlideShow.SlideShowID slideShowID)
+    {
 
     }
 
 
 
 
+
+    private static void MenuScene_BuildScene(On.Menu.MenuScene.orig_BuildScene orig, MenuScene self)
+    {
+        orig(self);
+        /*if (self.sceneID == altEndingScene)
+        {
+            self.sceneFolder = "scenes" + Path.DirectorySeparatorChar + "fp_altending";
+            // 啊啊啊啊啊啊为什么y是从下往上数的啊啊啊啊啊啊
+            // 这可比什么真正的代码bug难修多了，这比东西只能挨个试啊啊啊啊啊啊啊而且雨世界还不能实时更新mod代码啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊好崩溃
+            self.AddIllustration(new MenuDepthIllustration(self.menu, self, self.sceneFolder, "Background", new Vector2(492, 297), 3.7f, MenuDepthIllustration.MenuShader.Normal));
+            self.AddIllustration(new MenuDepthIllustration(self.menu, self, self.sceneFolder, "Slugcat", new Vector2(605, 427), 2.8f, MenuDepthIllustration.MenuShader.Normal));
+            self.AddIllustration(new MenuDepthIllustration(self.menu, self, self.sceneFolder, "Grass 3", new Vector2(602, 264), 2.2f, MenuDepthIllustration.MenuShader.Normal));
+            self.AddIllustration(new MenuDepthIllustration(self.menu, self, self.sceneFolder, "Grass 2", new Vector2(446, 283), 2.0f, MenuDepthIllustration.MenuShader.Normal));
+            self.AddIllustration(new MenuDepthIllustration(self.menu, self, self.sceneFolder, "Grass 1", new Vector2(515, 265), 1.8f, MenuDepthIllustration.MenuShader.Normal));
+        }*/
+    }
+
+
+
+
+
+    // 这是打完结局，选择界面显示的那个
+    // 呃啊。。有那么多东西要画。。（er的一下死掉了
+    private static void SlugcatPage_AddAltEndingImage(On.Menu.SlugcatSelectMenu.SlugcatPage.orig_AddAltEndingImage orig, SlugcatSelectMenu.SlugcatPage self)
+    {
+        if (self.slugcatNumber == Plugin.SlugcatStatsName)
+        {
+/*            // 先别动这些东西，这是我复制的机猫代码，虽然他现在还有问题的，但删了会导致问题更大（
+            self.imagePos = new Vector2(683f, 484f);
+            self.slugcatDepth = 2.8f;
+            self.sceneOffset = new Vector2(10f, 75f);
+            self.sceneOffset.x -= (1366f - self.menu.manager.rainWorld.options.ScreenSize.x) / 2f;*/
+            self.slugcatDepth = 3f;
+            self.sceneOffset = new Vector2(10f, 75f);
+            self.slugcatImage = new InteractiveMenuScene(self.menu, self, altEndingScene);
+            foreach (var item in self.subObjects)
+            {
+                Plugin.Log("aleendingmenu: ", item);
+            }
+            self.subObjects.Insert(0, self.slugcatImage);
+        }
+        else { orig(self); }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #region 结局控制
 
     // 游戏界面
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -159,10 +237,10 @@ internal class CustomLore
         SaveState save = self.GetStorySession.saveState;
         if (self.GetStorySession.saveStateNumber.value == Plugin.SlugcatName)
         {
-            Plugin.Log("RainWorldGame_Win: cycle: " + save.cycleNumber);
+            Plugin.LogStat("RainWorldGame_Win: cycle: " + save.cycleNumber);
             if (!save.deathPersistentSaveData.altEnding && save.cycleNumber >= Plugin.Cycles)
             {
-                Plugin.Log("PebblesSlug Game Over !!! ++==== cycle:" + save.cycleNumber);
+                Plugin.Log("PebblesSlug Game Over !!! cycle:" + save.cycleNumber);
                 save.deathPersistentSaveData.redsDeath = true;
                 save.deathPersistentSaveData.ascended = false;
                 self.GoToRedsGameOver();
@@ -205,15 +283,7 @@ internal class CustomLore
 
 
 
-    private static void MenuScene_BuildScene(On.Menu.MenuScene.orig_BuildScene orig, MenuScene self)
-    {
 
-    }
-
-    private static void SlideShow_ctor(On.Menu.SlideShow.orig_ctor orig, Menu.SlideShow self, ProcessManager manager, Menu.SlideShow.SlideShowID slideShowID)
-    {
-
-    }
 
 
 
@@ -223,7 +293,7 @@ internal class CustomLore
     {
         if (self.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName)
         {
-            Plugin.Log("RainWorldGame_GoToRedsGameOver ++====");
+            Plugin.Log("RainWorldGame_GoToRedsGameOver:");
             Plugin.Log("redsDeath:", self.GetStorySession.saveState.deathPersistentSaveData.redsDeath.ToString());
             Plugin.Log("altEnding:", self.GetStorySession.saveState.deathPersistentSaveData.altEnding.ToString());
             Plugin.Log("ascended:", self.GetStorySession.saveState.deathPersistentSaveData.ascended.ToString());
@@ -231,7 +301,18 @@ internal class CustomLore
 
             // 怪事。redsDeath死活挂不上，底下那ilhook也没写错，但log是一点反应都没有。剩下两个结局就没毛病。事已至此，只能启动planB了！
 
-            if (self.GetStorySession.saveState.deathPersistentSaveData.redsDeath)
+            if (self.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+            {
+                self.manager.statsAfterCredits = true;
+                // 暂时代替一下。虽然但是，归乡的时候这个也不会显示
+                self.manager.nextSlideshow = MoreSlugcatsEnums.SlideShowID.GourmandAltEnd;
+                self.manager.RequestMainProcessSwitch(ProcessManager.ProcessID.SlideShow);
+                return;
+            }
+
+            // if (self.GetStorySession.saveState.deathPersistentSaveData.redsDeath)
+            // 能调用到这个函数，不是结局就是死了（大概
+            else  
             {
                 if (self.manager.upcomingProcess != null) return;
                 self.manager.musicPlayer?.FadeOutAllSongs(20f);
@@ -255,18 +336,11 @@ internal class CustomLore
                 self.manager.rainWorld.progression.SaveWorldStateAndProgression(false);
                 self.manager.statsAfterCredits = true;
                 // 准备加点slideshow，这样玩家才知道自己已经寄啦
-                // self.manager.nextSlideshow = DroneMasterEnums.DroneMasterAltEnd;
+                // 算了，不要了 但我得想个办法改一下统计界面的那个图
 
             }
 
-            else if (self.GetStorySession.saveState.deathPersistentSaveData.altEnding)
-            {
-                self.manager.statsAfterCredits = true;
-                // 暂时代替一下。虽然但是，归乡的时候这个也不会显示
-                self.manager.nextSlideshow = MoreSlugcatsEnums.SlideShowID.GourmandAltEnd;
-                self.manager.RequestMainProcessSwitch(ProcessManager.ProcessID.SlideShow);
-                return;
-            }
+            
 
         }
         orig(self);
@@ -331,7 +405,6 @@ internal class CustomLore
 
 
     // 防止玩家用特殊手段归乡（别想在酒吧点炒饭
-    // 我暂且先禁用这个函数，因为我正经结局没做好，先拿归乡结局代替一下（目移
     private static void MSCRoomSpecificScript_GourmandEnding_Update(On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.orig_Update orig, MSCRoomSpecificScript.OE_GourmandEnding self, bool eu)
     {
         if (!ModManager.CoopAvailable)
@@ -363,9 +436,15 @@ internal class CustomLore
 
     private static void Room_Loaded(On.Room.orig_Loaded orig, Room self)
     {
+        if (self.abstractRoom.name == "SS_AI")
+        {
+            Plugin.Log("Room_Loaded: SS_AI room specific script added !");
+            self.roomSettings.roomSpecificScript = true;
+        }
         orig(self);
         // 在这里加入roomspecificscript。救命。没人讲过开发者工具怎么用，结果我就把那个SS_AI房间的什么着色效果给搞坏了，现在每次进去都会被橙色闪瞎狗眼。。
-        Plugin.Log("Room_Loaded: ", self.abstractRoom.name);
+        // 好了，修好了。
+        
     }
 
 
@@ -379,7 +458,7 @@ internal class CustomLore
 }
 
 
-
+    #endregion
 
 
 
@@ -388,19 +467,30 @@ internal class CustomLore
 internal class RoomSpecificScripts
 {
 
-    internal void RoomSpecificScriptsApply()
+    internal static void Apply()
     {
         On.MoreSlugcats.MSCRoomSpecificScript.AddRoomSpecificScript += MSCRoomSpecificScript_AddRoomSpecificScript;
     }
 
-    private void MSCRoomSpecificScript_AddRoomSpecificScript(On.MoreSlugcats.MSCRoomSpecificScript.orig_AddRoomSpecificScript orig, Room room)
+    private static void MSCRoomSpecificScript_AddRoomSpecificScript(On.MoreSlugcats.MSCRoomSpecificScript.orig_AddRoomSpecificScript orig, Room room)
     {
         string name = room.abstractRoom.name;
 
         // 只能触发一次
-        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveState.saveStateNumber.value == "PebblesSlug" && !room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName 
+            && !room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
         {
+            Plugin.Log("AddRoomSpecificScript: SS_AI ending");
             room.AddObject(new SS_PebblesAltEnding(room));
+        }
+        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName 
+            && room.abstractRoom.firstTimeRealized && room.game.GetStorySession.saveState.cycleNumber == 0
+            && !room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding
+            )
+        {
+            // 这不会导致我返回这个房间的时候再看一次动画罢
+            Plugin.Log("AddRoomSpecificScript: SS_AI ending");
+            room.AddObject(new SS_PebblesStartCutscene(room));
         }
 
     }
@@ -484,7 +574,6 @@ internal class RoomSpecificScripts
                 Plugin.Log("PebblesSlug Alt Ending !!!");
                 // 这句话对我来说没用吧
                 room.game.GetStorySession.saveState.miscWorldSaveData.SSaiThrowOuts = 0;
-                // 好了，真的问题来了。我得把下面这个函数复现一遍，因为我没法往里传参数，但隔壁还有一个东西要用这函数
                 // 好吧我想到了。在这里挂altending，还是在那个函数里判断吧
                 room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding = true;
                 room.game.GoToRedsGameOver();
@@ -500,65 +589,257 @@ internal class RoomSpecificScripts
 
 
 
-        public Player.InputPackage GetInput()
-        {
-            // 好家伙 替你控制玩家了这是 回头做控制面板的时候对这玩意儿下毒就行
-            return new Player.InputPackage(true, Options.ControlSetup.Preset.None, 0, 0, false, false, false, false, false);
-        }
-
-
-        public class EndingController : Player.PlayerController
-        {
-
-            private SS_PebblesAltEnding owner;
-            public EndingController(SS_PebblesAltEnding owner)
-            {
-                this.owner = owner;
-            }
-
-            public override Player.InputPackage GetInput()
-            {
-                return owner.GetInput();
-            }
-
-        }
 
 
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 
     // 呃，这应该是开头播放的一段动画之类，总之先空出来。。。真正的难点要开始了
     // 搜索：public class DS_RIVSTARTcutscene : UpdatableAndDeletable
-    internal class SSPebblesStartCutscene : UpdatableAndDeletable
+    public class SS_PebblesStartCutscene : UpdatableAndDeletable
     {
-        internal SSPebblesStartCutscene(Room room)
-        {
+        private int timer;
+        private new Room room;
 
+
+        public SS_PebblesStartCutscene(Room room)
+        {
+            timer = 0;
+            this.room = room;
         }
+
         public override void Update(bool eu)
         {
-            if (this.timer >= 90)
+            
+            base.Update(eu);
+            if (timer == 10)
             {
-                this.Destroy();
-                return;
+                Plugin.Log("START CUTSCENE room effects");
+                if (room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.DarkenLights) == null)
+                {
+                    room.roomSettings.effects.Add(new RoomSettings.RoomEffect(RoomSettings.RoomEffect.Type.DarkenLights, 0f, false));
+                }
+                if (room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.Darkness) == null)
+                {
+                    room.roomSettings.effects.Add(new RoomSettings.RoomEffect(RoomSettings.RoomEffect.Type.Darkness, 0f, false));
+                }
+                if (room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.Contrast) == null)
+                {
+                    room.roomSettings.effects.Add(new RoomSettings.RoomEffect(RoomSettings.RoomEffect.Type.Contrast, 0f, false));
+                }
             }
-            AbstractCreature firstAlivePlayer = this.room.game.FirstAlivePlayer;
-            if (this.room.game.session is StoryGameSession && this.room.game.Players.Count > 0 && firstAlivePlayer != null && firstAlivePlayer.realizedCreature != null && firstAlivePlayer.realizedCreature.room == this.room && this.room.game.GetStorySession.saveState.cycleNumber == 0)
+
+            AbstractCreature firstAlivePlayer = room.game.FirstAlivePlayer;
+            if (room.game.session is StoryGameSession && room.game.Players.Count > 0 && firstAlivePlayer != null && firstAlivePlayer.realizedCreature != null && firstAlivePlayer.realizedCreature.room == room && room.game.GetStorySession.saveState.cycleNumber == 0)
             {
                 Player player = firstAlivePlayer.realizedCreature as Player;
 
                 // 不知道这个会不会有bug，碰见问题先把他注释了
-                player.objectInStomach = new AbstractPhysicalObject(this.room.world, AbstractPhysicalObject.AbstractObjectType.SSOracleSwarmer, null, new WorldCoordinate(this.room.abstractRoom.index, -1, -1, 0), this.room.game.GetNewID());
-                player.SuperHardSetPosition(new Vector2(500f, 500f));
-                player.mainBodyChunk.vel = new Vector2(0f, -5f);
-                player.Stun(100);
+                player.objectInStomach = new AbstractPhysicalObject(room.world, AbstractPhysicalObject.AbstractObjectType.SSOracleSwarmer, null, new WorldCoordinate(room.abstractRoom.index, -1, -1, 0), room.game.GetNewID());
+                if (timer <= 110)
+                {
+                    player.SuperHardSetPosition(new Vector2(569.7f, 643.5f));
+                }
+                if (timer == 110)
+                {
+                    Plugin.Log("START CUTSCENE player enter");
+                    player.mainBodyChunk.vel = new Vector2(0f, -2f);
+                    player.Stun(60);
+                }
             }
-            this.timer++;
+            // 怎么播放这个也没声音啊（恼
+            if (timer >= 80 && timer < 110)
+            {
+                room.PlaySound(SoundID.Player_Tick_Along_In_Shortcut, new Vector2(569.7f, 643.5f));
+            }
+            if (timer == 110)
+            {
+                room.PlaySound(SoundID.Player_Exit_Shortcut, new Vector2(569.7f, 643.5f));
+            }
+
+            if (timer == 180)
+            {
+                // 屏幕怎么不晃啊（恼
+                // 晃啊！tnnd，为什么不晃！！
+                for (int i = 0; i < room.game.cameras.Length; i++)
+                {
+                    if (room.game.cameras[i].room == room && !room.game.cameras[i].AboutToSwitchRoom)
+                    {
+                        room.game.cameras[i].ScreenMovement(null, Vector2.zero, 15f);
+                    }
+                }
+            }
+            if (this.timer > 180 && this.timer < 260 && this.timer % 16 == 0)
+            {
+                room.ScreenMovement(null, new Vector2(0f, 0f), 2.5f);
+                for (int j = 0; j < 6; j++)
+                {
+                    if (Random.value < 0.5f)
+                    {
+                        room.AddObject(new OraclePanicDisplay.PanicIcon(new Vector2((float)Random.Range(230, 740), (float)Random.Range(100, 620))));
+                    }
+                }
+            }
+
+            if (timer == 340)
+            {
+                room.AddObject(new TestSprite(new Vector2(300, 500), 6, 2f));
+            }
+            if (timer == 350)
+            {
+                room.AddObject(new TestSprite(new Vector2(300, 360), 12, 1.5f));
+            }
+            if (timer == 360)
+            {
+                room.AddObject(new TestSprite(new Vector2(300, 300), 15, 1.5f));
+            }
+
+
+            if (timer == 740)
+            {
+                room.game.cameras[0].hud.textPrompt.AddMessage(room.game.rainWorld.inGameTranslator.Translate(Plugin.strings[0]), 140, 500, true, true);
+                Plugin.Log(room.game.GetStorySession.saveState.totTime);
+            }
+
+            if (timer >= 800)
+            {
+                Destroy();
+                return;
+            }
+            Plugin.Log("timer: ", timer);
+            timer++;
         }
-        private int timer;
+
+
+
     }
 
 
+    
+
+
+
+}
+
+
+
+
+public class TestSprite : CosmeticSprite
+{
+
+    private bool visible = true;
+    private int num;
+    private float scale;
+
+    public TestSprite(Vector2 position, int num, float scale)
+    {
+        pos = position;
+        this.num = num;
+        this.scale = scale;
+    }
+
+
+
+
+    public override void Update(bool eu)
+    {
+        timer++;
+        
+        if (timer >= 190)
+        {
+            Destroy();
+        }
+        base.Update(eu);
+    }
+
+
+
+
+
+
+    public override void InitiateSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam)
+    {
+        sLeaser.sprites = new FSprite[num];
+        FSprite[] glyphs = 
+        { 
+            new("BigGlyph0", true),
+            new("BigGlyph1", true),
+            new("BigGlyph2", true),
+            new("BigGlyph3", true),
+            new("BigGlyph4", true),
+            new("BigGlyph5", true),
+            new("BigGlyph6", true),
+            new("BigGlyph7", true),
+            new("BigGlyph8", true),
+            new("BigGlyph9", true),
+            new("BigGlyph10", true),
+            new("BigGlyph11", true),
+            new("BigGlyph12", true) 
+        };
+        System.Random r = new();
+        for (int i = 0; i < sLeaser.sprites.Length; i++)
+        {
+            int randint = r.Next(0, glyphs.Length);
+            Plugin.Log("sprites: ", i, " sp: ", randint);
+            sLeaser.sprites[i] = glyphs[randint];
+            sLeaser.sprites[i].color = new Color(0f, 0f, 0f);
+            sLeaser.sprites[i].isVisible = true;
+            sLeaser.sprites[i].scale = scale;
+            
+        }
+        // 世界未解之谜：为什么有的会显示不出来
+        AddToContainer(sLeaser, rCam, rCam.ReturnFContainer("BackgroundShortcuts"));
+    }
+
+
+
+
+
+
+    public override void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
+    {
+        int textSpeed = 10;
+        if (timer > 160 && timer % 8 < 4)
+        {
+            visible = false;
+        }
+        else { visible = true; }
+        for (int i = 0; i < sLeaser.sprites.Length; i++)
+        {
+            sLeaser.sprites[i].x = pos.x - camPos.x + (20 * scale * i);
+            sLeaser.sprites[i].y = pos.y - camPos.y;
+            sLeaser.sprites[i].isVisible = visible;
+
+        }
+        base.DrawSprites(sLeaser, rCam, timeStacker, camPos);
+    }
+
+
+    public override void Destroy()
+    {
+        base.Destroy();
+    }
+
+
+    // Token: 0x040041BE RID: 16830
+    public int timer;
+
+    // Token: 0x040041BF RID: 16831
+    public float circleScale;
 }

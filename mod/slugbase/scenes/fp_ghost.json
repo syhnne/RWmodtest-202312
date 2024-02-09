@@ -1,6 +1,6 @@
 {
 	"id": "Ghost_PebblesSlug",
-	"scene_folder": "scenes/slugcat - prototype",
+	"scene_folder": "scenes/fp_ghost",
 	"images": [
 		{ "name": "Background", "pos": [492, 297], "depth": 3.7, "shader": "Basic" },
 		{ "name": "Grass 3",    "pos": [602, 264], "depth": 2.2, "shader": "Basic" },

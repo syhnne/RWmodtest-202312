@@ -13,7 +13,9 @@ using BepInEx;
 
 namespace PebblesSlug;
 
-
+/// <summary>
+/// 打完结局后解锁的控制台，可以让你使用一些迭代器特有的奇妙能力（？
+/// </summary>
 
 
 // 我要是真把这玩意儿做出来了，我就要请自己吃一顿大餐
@@ -81,21 +83,23 @@ public class SSOracleConsole : UpdatableAndDeletable
             vector.x += 170;
         }
         destination = player.mainBodyChunk.pos - vector;
+        behavior.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
         if (!isActive) 
         {
-            behavior.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
+            behavior.floatyMovement = true;
             return; 
         }
-
+        
 
 
 
         base.Update(eu);
-        behavior.movementBehavior = SSOracleBehavior.MovementBehavior.Idle;
+        // 准备让他别动了 不然好鬼畜（
+        /*behavior.movementBehavior = SSOracleBehavior.MovementBehavior.Idle;
         behavior.floatyMovement = false;
        
         behavior.SetNewDestination(destination);
-        behavior.currentGetTo = destination;
+        behavior.currentGetTo = destination;*/
         behavior.lookPoint = destination;
 
         
@@ -106,6 +110,17 @@ public class SSOracleConsole : UpdatableAndDeletable
 
 
 
+
+    // 进房间时显示食物（就像进庇护所一样
+    public void Enter()
+    {
+        if (player.room == null || player.room.abstractRoom.name != "SS_AI") return;
+
+        if (!player.room.game.cameras[0].hud.showKarmaFoodRain)
+        {
+            player.showKarmaFoodRainTime = 40;
+        }
+    }
 
 
 

@@ -49,48 +49,48 @@ public class PebblesSlugOption : OptionInterface
         
         Tabs = new OpTab[]
         {
-            new OpTab(this, "Options"),
-            new OpTab(this, "Gravity Control")
+            new OpTab(this, Plugin.strings[13]),
+            new OpTab(this, Plugin.strings[14])
         };
 
 
-        string desc = "Explosion capacity";
+        string desc = Plugin.strings[2];
         Tabs[0].AddItems(
-            new OpLabel(xposLabel, ymax - yspacing, inGameTranslator.Translate("Explosion capacity"))
-            { description = desc },
+            new OpLabel(xposLabel, ymax - yspacing, inGameTranslator.Translate(Plugin.strings[1]))
+            { description = inGameTranslator.Translate(desc) },
             new OpSlider(ExplosionCapacity, new Vector2(xposOpt, ymax - yspacing), 360, false)
             {
                 min = 5,
                 max = 20,
                 defaultValue = DefaultExplosionCapacity.ToString(),
-                description = desc
+                description = inGameTranslator.Translate(desc)
             }
         );
 
-        desc = "Add food when electrocuted by centipedes and zapcoils or crafting with electric spears";
+        desc = Plugin.strings[4];
         Tabs[0].AddItems(
-            new OpLabel(xposLabel, ymax - yspacing - 50f, inGameTranslator.Translate("Add food by electric means"))
-            { description = desc },
+            new OpLabel(xposLabel, ymax - yspacing - 50f, inGameTranslator.Translate(Plugin.strings[3]))
+            { description = inGameTranslator.Translate(desc) },
             new OpCheckBox(AddFoodOnShock, xposOpt, ymax - yspacing - 50f)
-            { description = desc }
+            { description = inGameTranslator.Translate(desc) }
         );
 
 
-        desc = "The key to be pressed when crafting electric spears (if unspecified, hold [pickup] to craft)";
+        desc = Plugin.strings[6];
         Tabs[0].AddItems(
-            new OpLabel(xposLabel, ymax - yspacing - 100f, inGameTranslator.Translate("Crafting key"), false)
-            { description = desc },
+            new OpLabel(xposLabel, ymax - yspacing - 100f, inGameTranslator.Translate(Plugin.strings[5]), false)
+            { description = inGameTranslator.Translate(desc) },
             new OpKeyBinder(CraftKey, new Vector2(xposOpt, ymax - yspacing - 100f), new Vector2(50f, 10f), true, OpKeyBinder.BindController.AnyController)
-            { description = desc }
+            { description = inGameTranslator.Translate(desc) }
         );
 
 
 
         // 我怎么你了？怎么改不了啊？
-        desc = "(WIP)The key to toggle SS_AI console. For unknown reasons this doesn't work right now, but you can use Tab to toggle the console.";
+        desc = Plugin.strings[8];
         Tabs[0].AddItems(
-            new OpLabel(xposLabel, ymax - yspacing - 150f, inGameTranslator.Translate("oracle console"), false)
-            { description = desc }/*,
+            new OpLabel(xposLabel, ymax - yspacing - 150f, inGameTranslator.Translate(Plugin.strings[7]), false)
+            { description = inGameTranslator.Translate(desc) }/*,
             new OpKeyBinder(fpConsoleKey, new Vector2(xposOpt, ymax - yspacing - 150f), new Vector2(50f, 10f), true, OpKeyBinder.BindController.AnyController)
             { description = desc }*/
         );
@@ -99,20 +99,20 @@ public class PebblesSlugOption : OptionInterface
 
 
 
-        desc = "The key to be pressed when controlling gravity";
+        desc = Plugin.strings[10];
         Tabs[1].AddItems(
-            new OpLabel(xposLabel, ymax - yspacing, inGameTranslator.Translate("Gravity control key"), false)
-            { description = desc },
+            new OpLabel(xposLabel, ymax - yspacing, inGameTranslator.Translate(Plugin.strings[9]), false)
+            { description = inGameTranslator.Translate(desc) },
             new OpKeyBinder(GravityControlKey, new Vector2(xposOpt, ymax - yspacing), new Vector2(50f, 10f), true, OpKeyBinder.BindController.AnyController)
-            { description = desc }
+            { description = inGameTranslator.Translate(desc) }
         );
 
-        desc = "(WIP)The key to toggle gravity control";
+        desc = Plugin.strings[12];
         Tabs[1].AddItems(
-            new OpLabel(xposLabel, ymax - yspacing - 50f, inGameTranslator.Translate("Gravity control toggle"), false)
-            { description = desc },
+            new OpLabel(xposLabel, ymax - yspacing - 50f, inGameTranslator.Translate(Plugin.strings[11]), false)
+            { description = inGameTranslator.Translate(desc) },
             new OpKeyBinder(GravityControlToggle, new Vector2(xposOpt, ymax - yspacing - 50f), new Vector2(50f, 10f), true, OpKeyBinder.BindController.AnyController)
-            { description = desc }
+            { description = inGameTranslator.Translate(desc) }
         );
 
     }

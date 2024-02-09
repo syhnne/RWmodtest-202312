@@ -57,7 +57,7 @@ internal class PlayerHooks
 
 
         // 禁止玩家输入
-        // On.Player.MovementUpdate += Player_MovementUpdate;
+        On.Player.MovementUpdate += Player_MovementUpdate;
 
 
         // On.RoomCamera.FireUpSinglePlayerHUD += RoomCamera_FireUpSinglePlayerHUD;
@@ -77,6 +77,7 @@ internal class PlayerHooks
 
         internal SSOracleConsole console;
         internal GravityController gravityController;
+        internal int SS_AIsleepCounter = 60;
 
 
         public PlayerModule(Player player)
@@ -93,11 +94,12 @@ internal class PlayerHooks
 
             if (playerName == Plugin.SlugcatStatsName && storyName != null)
             {
+                Plugin.Log("gravityController added!");
                 gravityController = new GravityController(player);
             }
             if (isPebbles)
             {
-                Plugin.LogStat("playermodule added!");
+                
 
             }
                 
@@ -124,6 +126,11 @@ internal class PlayerHooks
                 Plugin.LogStat("toggle console active: ", console.isActive);
             }
 
+            /*if (gravityController != null)
+            {
+                lockInput = gravityController.isAbleToUse;
+            }*/
+
         }
 
     }
@@ -134,13 +141,21 @@ internal class PlayerHooks
 
 
 
-    // 启用控制台时阻止玩家输入
+    // 启用控制台或者重力控制时阻止玩家输入
     private static void Player_MovementUpdate(On.Player.orig_MovementUpdate orig, Player self, bool eu)
     {
         bool getModule = Plugin.playerModules.TryGetValue(self, out var module) && module.playerName == Plugin.SlugcatStatsName;
-        if (getModule && module.lockInput)
+        if (getModule)
         {
-            self.input[0] = new Player.InputPackage();
+            if (module.lockInput)
+            {
+                self.input[0] = new Player.InputPackage();
+            }
+            else if (module.gravityController != null && module.gravityController.isAbleToUse)
+            {
+                module.gravityController.inputY = self.input[0].y;
+                self.input[0].y = 0;
+            }
         }
         orig(self, eu);
     }
@@ -153,7 +168,7 @@ internal class PlayerHooks
 
 
 
-    // 各种hud
+    // 重力控制hud
     private static void HUD_InitSinglePlayerHud(On.HUD.HUD.orig_InitSinglePlayerHud orig, HUD.HUD self, RoomCamera cam)
     {
         orig(self, cam);
@@ -165,8 +180,6 @@ internal class PlayerHooks
                 Plugin.LogStat("HUD add GravityMeter");
                 self.AddPart(new GravityMeter(self, self.fContainers[1], module.gravityController));
             }
-            // 没办法了，这是一种让我在SS_AI房间加载出来的时候也能访问到hud的阴招
-            // Plugin.instance.Hud = self;
 
         }
 

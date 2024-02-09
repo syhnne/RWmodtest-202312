@@ -64,7 +64,31 @@ public class SSOracleHooks
             typeof(SSOracleBehavior.SubBehavior).GetProperty(nameof(SSOracleBehavior.SubBehavior.LowGravity), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
             SSOracleBehavior_SubBehavior_lowGravity
             );
+
+        new Hook(
+            typeof(SSOracleBehavior).GetProperty(nameof(SSOracleBehavior.EyesClosed), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            SSOracleBehavior_EyesClosed
+            );
     }
+
+
+    // 这恐怕是唯一修改重力的办法了。。我很怀疑他会不会使得一些性能不太好的电脑掉帧
+    private delegate bool orig_EyesClosed(SSOracleBehavior self);
+    private static bool SSOracleBehavior_EyesClosed(orig_EyesClosed orig, SSOracleBehavior self)
+    {
+        var result = orig(self);
+        if (self.oracle.room.game != null && self.oracle.room.game.session is StoryGameSession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        {
+            bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+            if (getModule && module.console != null && module.console.player != null)
+            {
+                result = !module.console.isActive;
+            }
+        }
+        return result;
+    }
+
+
 
 
 
@@ -98,13 +122,27 @@ public class SSOracleHooks
         if (self.oracle.room.game != null && self.oracle.room.game.session is StoryGameSession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.oracle.ID == Oracle.OracleID.SS)
         {
             self.FindPlayer();
-            for (int i = 0; i < self.oracle.room.game.cameras.Length; i++)
+            /*for (int i = 0; i < self.oracle.room.game.cameras.Length; i++)
             {
                 if (self.oracle.room.game.cameras[i].room == self.oracle.room && !self.oracle.room.game.cameras[i].AboutToSwitchRoom)
                 {
                     self.oracle.room.game.cameras[i].ChangeBothPalettes(10, 26, 0.51f + Mathf.Sin(self.unconciousTick * 0.25707963f) * 0.35f);
                 }
+            }*/
+
+            if (self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.DarkenLights) != null)
+            {
+                self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.DarkenLights).amount = Mathf.Lerp(0f, 1f, 0.2f +Mathf.Sin(self.unconciousTick * 0.15f));
             }
+            if (self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.Darkness) != null)
+            {
+                self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.Darkness).amount = Mathf.Lerp(0f, 0.4f, 0.2f + Mathf.Sin(self.unconciousTick * 0.15f));
+            }
+            if (self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.Contrast) != null)
+            {
+                self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.Contrast).amount = Mathf.Lerp(0f, 0.3f, 0.2f + Mathf.Sin(self.unconciousTick * 0.15f));
+            }
+
             self.unconciousTick += 1f;
             self.oracle.setGravity(0.9f);
 
@@ -219,7 +257,6 @@ public class SSOracleHooks
         if (getModule) 
         {
             module.console?.Update(eu);
-
             /*// 没辙了，我要使用一个非常烂的办法
             if (module.console.player != null)
             {
