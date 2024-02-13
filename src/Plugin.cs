@@ -32,6 +32,7 @@ using static MonoMod.InlineRT.MonoModRule;
 using System.Runtime.CompilerServices;
 using IL.Menu;
 using HUD;
+using MonoMod.Utils;
 
 namespace PebblesSlug;
 
@@ -86,7 +87,10 @@ class Plugin : BaseUnityPlugin
     internal static readonly Oracle.OracleID oracleID = new Oracle.OracleID("PL");
     internal static readonly bool ShowLogs = true;
     internal static Plugin instance;
-    // 以防我测试的时候不能使用一些功能，发布的时候就改成false
+
+    /// <summary>
+    /// 以防我测试的时候不能使用一些功能，发布的时候就改成false
+    /// </summary>
     public static bool DevMode = true;
 
     /// <summary>
@@ -158,6 +162,7 @@ class Plugin : BaseUnityPlugin
             PlayerHooks.Apply();
             RoomSpecificScripts.Apply();
             ShelterSS_AI.Apply();
+            SSRoomEffects.Apply();
 
             On.Player.ClassMechanicsArtificer += Player_ClassMechanicsArtificer;
             On.Player.CraftingResults += Player_CraftingResults;
@@ -184,11 +189,10 @@ class Plugin : BaseUnityPlugin
 
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
             IL.ZapCoil.Update += IL_ZapCoil_Update;
-            On.ZapCoil.Update += ZapCoil_Update;
-            // On.GravityDisruptor.Update += GravityDisruptor_Update;
+            
             IL.Centipede.Shock += Centipede_Shock;
 
-            On.CoralBrain.SSMusicTrigger.Trigger += CoralBraim_SSMusicTrigger_Trigger;
+            
 
 
             On.PlayerGraphics.InitiateSprites += PlayerGraphics_InitiateSprites;
@@ -290,6 +294,7 @@ class Plugin : BaseUnityPlugin
             foreach (object s in text) 
             { 
                 log += s.ToString(); 
+                log += " ";
             }
             Debug.Log("[PebblesSlug] : " + log);
         }
@@ -308,6 +313,7 @@ class Plugin : BaseUnityPlugin
             foreach (object s in text)
             {
                 log += s.ToString();
+                log += " ";
             }
             Debug.Log("[PebblesSlug] " + log);
         }
@@ -884,7 +890,7 @@ class Plugin : BaseUnityPlugin
 
         if (getModule) module.Update(self, eu);
 
-
+        
         orig(self, eu);
         self.redsIllness?.Update();
 
@@ -896,7 +902,7 @@ class Plugin : BaseUnityPlugin
             module.gravityController?.Update(eu, isMyStory);
         }
 
-        if (isMyStory && self.room.abstractRoom.name == "SS_AI" && self.AI == null && self.room.game.IsStorySession && !self.dead && !self.Sleeping)
+        if (isMyStory && self.room.abstractRoom.name == "SS_AI" && self.AI == null && !self.dead && !self.Sleeping && self.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
         {
             ShelterSS_AI.Player_Update(self);
         }
@@ -987,36 +993,6 @@ class Plugin : BaseUnityPlugin
 
 
 
-    #region 地图效果修改
-
-
-
-
-
-
-    // 啊啊啊啊啊啊啊啊啊别放音乐了
-    private void CoralBraim_SSMusicTrigger_Trigger(On.CoralBrain.SSMusicTrigger.orig_Trigger orig, CoralBrain.SSMusicTrigger self)
-    {
-        if (self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && !self.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
-        {
-            return;
-        }
-        orig(self);
-    }
-
-
-
-
-
-
-
-    #endregion
-
-
-
-
-
-
 
 
 
@@ -1094,8 +1070,8 @@ class Plugin : BaseUnityPlugin
         if (!DevMode) return;
         if (self.room != null)
         {
-            Plugin.Log("ROOM: ", self.room.abstractRoom.name, " SHELTER INDEX: ",self.room.abstractRoom.shelterIndex);
-            if (self.room.abstractRoom.isAncientShelter) { Plugin.Log("IS ANCIENT SHELTER"); }
+            Plugin.LogStat("ROOM: ", self.room.abstractRoom.name, " SHELTER INDEX: ",self.room.abstractRoom.shelterIndex);
+            if (self.room.abstractRoom.isAncientShelter) { Plugin.LogStat("IS ANCIENT SHELTER"); }
         }
 
     }
@@ -1107,7 +1083,7 @@ class Plugin : BaseUnityPlugin
 
     // 这才是设定上真正修改重力的家伙
     // 卧槽，他卡bug
-    private void GravityDisruptor_Update(On.GravityDisruptor.orig_Update orig, GravityDisruptor self, bool eu)
+    /*private void GravityDisruptor_Update(On.GravityDisruptor.orig_Update orig, GravityDisruptor self, bool eu)
     {
         try
         {
@@ -1123,7 +1099,7 @@ class Plugin : BaseUnityPlugin
         {
             Logger.LogError(e);
         }
-    }
+    }*/
 
 
 
@@ -1893,21 +1869,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    // TODO: 修好这个东西
-    // 喵的，我改了什么东西导致他有bug的
-    // 我真的想不明白，这个log他就不能告诉我是哪句话有问题吗
-    private void ZapCoil_Update(On.ZapCoil.orig_Update orig, ZapCoil self, bool eu)
-    {
-        try
-        {
-            orig(self, eu);
-        }
-        catch (Exception ex)
-        {
-            // base.Logger.LogError(ex);
-        }
 
-    }
 
 
 
@@ -2027,18 +1989,24 @@ class Plugin : BaseUnityPlugin
     // 不能免疫蜈蚣的电击，但我认为这不是我的问题，是蜈蚣的问题。
     // 错了，好像是我的问题，这个violence怎么说
     // 没事了，确实是蜈蚣的问题，大蜈蚣电击致死是硬编码的
+    // 修复：为了防止雨循环结束后在下悬架被电的求生不能求死不得，这个效果在开始下雨之后会逐步失效
     private void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
     {
         if (self is Player && (self as Player).slugcatStats.name.value == SlugcatName)
         {
             if (type == Creature.DamageType.Electric)
             {
-                damage = 0.1f * damage;
-                stunBonus = 0.1f * stunBonus;
+                
+                damage = Mathf.Lerp(1f, 0.1f, self.room.world.rainCycle.RainApproaching) * damage;
+                stunBonus = Mathf.Lerp(1f, 0.1f, self.room.world.rainCycle.RainApproaching) * stunBonus;
+                
             }
         }
         orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
     }
+
+
+
     #endregion
 
 

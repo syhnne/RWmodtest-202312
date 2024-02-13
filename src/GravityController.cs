@@ -37,7 +37,7 @@ public class GravityController : UpdatableAndDeletable
     public GravityController(Player player)
     {
         this.player = player;
-        unlocked = (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding) || Plugin.DevMode;
+        unlocked = (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && player.room.game.GetStorySession.saveState.deathPersistentSaveData.ascended) || Plugin.DevMode;
         if (player.room != null && player.room.abstractRoom.name == "SS_AI" && player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
         {
             gravityBonus = 0;
@@ -62,6 +62,17 @@ public class GravityController : UpdatableAndDeletable
         {
             // 这个房间太特么难做了。。实不相瞒，写完我都不记得自己到底改了夺少东西
         }
+        else if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
+        {
+            // TODO: 这个有的时候不好使 SS_D05
+            if (gravityBonus != (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f)
+            && gravityBonus != (int)Mathf.Round(10f * 1f - player.room.gravity))
+            {
+                Plugin.LogStat("gravity mismatch IN BROKEN ZEROG AREA");
+                Plugin.LogStat("-- room gravity: ", player.room.gravity);
+                gravityBonus = (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f);
+            }
+        }
         // 这就是我不懂了，他这儿的effect amount还不是真正的重力，他加了个插值，他为什么要加，我真是一点也想不明白，这除了导致我修三个小时bug以外还有什么别的用处吗
         // 但是他这重力效果和室内灯光还是绑定的，我既不能访问这个AntiGravity的实例，又不能直接把它删了，我真的谢
         else if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.ZeroG) != null)
@@ -71,17 +82,6 @@ public class GravityController : UpdatableAndDeletable
                 Plugin.LogStat("gravity mismatch IN ZEROG AREA");
                 Plugin.LogStat("-- room gravity: ", player.room.gravity);
                 gravityBonus = (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f);
-            }
-        }
-        else if (player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) != null)
-        {
-            // TODO: 这个有的时候不好使 SS_D05
-            if (gravityBonus != (int)Mathf.Round((1f - Mathf.InverseLerp(0f, 0.85f, 1f - player.room.gravity)) * 10f)
-            && gravityBonus != (int)Mathf.Round(10f * 1f - player.room.gravity))
-            {
-                Plugin.LogStat("gravity mismatch IN BROKEN ZEROG AREA");
-                Plugin.LogStat("-- room gravity: ", player.room.gravity);
-                gravityBonus = (int)Mathf.Round(10f * player.room.gravity);
             }
         }
         else if (gravityBonus != (int)Mathf.Round(10f * player.room.gravity))
@@ -176,7 +176,7 @@ public class GravityController : UpdatableAndDeletable
             return;
         }
         // 防止玩家一开局就看见fp倒着漂浮在空中（好崩溃
-        else if (player.room.abstractRoom.name == "SS_AI" && !player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+        else if (player.room.abstractRoom.name == "SS_AI" && !player.room.game.GetStorySession.saveState.deathPersistentSaveData.ascended)
         {
             // 这里不能直接修改重力，只能修改bonus，让SSOracleBehavior_SubBehavior_lowGravity来读这个
             RoomHasEffect = true;

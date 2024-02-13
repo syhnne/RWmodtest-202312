@@ -3,7 +3,7 @@
 	"name": "PebblesSlug",
 	"version": "0.1.0",
 	"authors": "Emily1212",
-	"description": "摆烂了",
+	"description": "你说得对，但是NullReferenceException: Object reference not set to an instance of an object",
 	"requirements": [ "slime-cubed.slugbase", "moreslugcats" ],
 	"requirements_names": [ "SlugBase", "More Slugcats Expansion" ],
 	"tags": [ "Custom Slugcat" ]

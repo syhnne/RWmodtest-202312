@@ -26,6 +26,7 @@ using MonoMod.RuntimeDetour;
 using System.Reflection;
 using SlugBase.SaveData;
 using static PebblesSlug.PlayerHooks;
+using System.Runtime.InteropServices;
 
 
 
@@ -35,7 +36,14 @@ namespace PebblesSlug;
 
 
 
-
+/// <summary>
+/// 我尝试给fp洗脑让他相信自己是一只蛞蝓猫，但是现在已经明显地失败啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊
+/// </summary>
+/// 
+/// 讲个笑话：我突然意识到用ssoraclebehavior可以直接从oracle访问到player
+/// 所以我压根没必要把这个类挂在oracle上面
+/// 绷不住了，我真懒得把这一坨删了重写。。。。
+/// 
 public class SSOracleHooks
 {
 
@@ -48,8 +56,10 @@ public class SSOracleHooks
         On.SSOracleBehavior.SeePlayer += SSOracleBehavior_SeePlayer;
         On.SSOracleBehavior.Update += SSOracleBehavior_Update;
         On.Oracle.Destroy += Oracle_Destroy;
+        On.SSOracleBehavior.NewAction += SSOracleBehavior_NewAction;
         // On.OracleBehavior.UnconciousUpdate += OracleBehavior_UnconciousUpdate;
         On.SSOracleBehavior.UnconciousUpdate += SSOracleBehavior_UnconciousUpdate;
+        On.SSOracleBehavior.storedPearlOrbitLocation += SSOracleBehavior_storedPearlOrbitLocation;
         On.PebblesPearl.Update += PebblesPearl_Update;
 
         // IL.Oracle.ctor += IL_Oracle_ctor;
@@ -60,10 +70,10 @@ public class SSOracleHooks
             Oracle_Consious
             );
 
-        new Hook(
+        /*new Hook(
             typeof(SSOracleBehavior.SubBehavior).GetProperty(nameof(SSOracleBehavior.SubBehavior.LowGravity), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
             SSOracleBehavior_SubBehavior_lowGravity
-            );
+            );*/
 
         new Hook(
             typeof(SSOracleBehavior).GetProperty(nameof(SSOracleBehavior.EyesClosed), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
@@ -72,43 +82,21 @@ public class SSOracleHooks
     }
 
 
-    // 这恐怕是唯一修改重力的办法了。。我很怀疑他会不会使得一些性能不太好的电脑掉帧
-    private delegate bool orig_EyesClosed(SSOracleBehavior self);
-    private static bool SSOracleBehavior_EyesClosed(orig_EyesClosed orig, SSOracleBehavior self)
+
+
+    #region 结局前
+
+
+    // 婴儿般的睡眠。jpg
+    private delegate bool orig_Consious(Oracle self);
+    private static bool Oracle_Consious(orig_Consious orig, Oracle self)
     {
         var result = orig(self);
-        if (self.oracle.room.game != null && self.oracle.room.game.session is StoryGameSession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        if (self.room.game.session is StoryGameSession && self.ID == Oracle.OracleID.SS && (self.room.game.session as StoryGameSession).saveState.saveStateNumber == Plugin.SlugcatStatsName && (self.room.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding != true)
         {
-            bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
-            if (getModule && module.console != null && module.console.player != null)
-            {
-                result = !module.console.isActive;
-            }
+            result = false;
         }
         return result;
-    }
-
-
-
-
-
-    // 珍珠会绕着猫转
-    // 但是效果没有我想象中那么好（。
-    private static void PebblesPearl_Update(On.PebblesPearl.orig_Update orig, PebblesPearl self, bool eu)
-    {
-        orig(self, eu);
-        if (self.hoverPos == null && self.oracle != null && self.oracle.room == self.room && self.oracle.room.game.session is StoryGameSession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
-        {
-            bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
-            if (getModule && module.console != null && module.console.player != null && module.console.player.room == self.room)
-            {
-                if (!self.oracle.Consious) self.orbitObj = null;
-                // else if (module.console.isActive) self.orbitObj = module.console.player;
-                // else self.orbitObj = self.oracle;
-            }
-
-        }
-
     }
 
 
@@ -132,7 +120,7 @@ public class SSOracleHooks
 
             if (self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.DarkenLights) != null)
             {
-                self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.DarkenLights).amount = Mathf.Lerp(0f, 1f, 0.2f +Mathf.Sin(self.unconciousTick * 0.15f));
+                self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.DarkenLights).amount = Mathf.Lerp(0f, 1f, 0.2f + Mathf.Sin(self.unconciousTick * 0.15f));
             }
             if (self.oracle.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.Darkness) != null)
             {
@@ -161,6 +149,132 @@ public class SSOracleHooks
 
 
 
+    #endregion
+
+
+
+
+
+
+
+
+
+    private static void SSOracleBehavior_ctor(On.SSOracleBehavior.orig_ctor orig, SSOracleBehavior self, Oracle oracle)
+    {
+        orig(self, oracle);
+        if (oracle.room.game.session is not StoryGameSession || oracle.room.game.GetStorySession.saveState.saveStateNumber != Plugin.SlugcatStatsName) return;
+        self.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
+    }
+
+
+
+
+
+
+    // 在这里挂模组（万物起源，如果有问题就关它
+    private static void Oracle_ctor(On.Oracle.orig_ctor orig, Oracle self, AbstractPhysicalObject abstractPhysicalObject, Room room)
+    {
+        orig(self, abstractPhysicalObject, room);
+        if (self.room.game.session is StoryGameSession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        {
+            if (self.ID == Oracle.OracleID.SS)
+            {
+                Plugin.oracleModules.Add(self, new OracleModule(self));
+            }
+        }
+
+
+    }
+
+
+
+
+
+    // 垃圾回收
+    private static void Oracle_Destroy(On.Oracle.orig_Destroy orig, Oracle self)
+    {
+        orig(self);
+        if (self.ID == Oracle.OracleID.SS)
+        {
+            bool getModule = Plugin.oracleModules.TryGetValue(self, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+            if (getModule)
+            {
+                module.console.Destroy();
+                module.console.hud.ClearSprites();
+                module.console.hud = null;
+                module.console = null;
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    // 储存珍珠。纯复制粘贴。。
+    private static Vector2 SSOracleBehavior_storedPearlOrbitLocation(On.SSOracleBehavior.orig_storedPearlOrbitLocation orig, SSOracleBehavior self, int index)
+    {
+        if (self.oracle.room.game.IsStorySession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        {
+            float num = 5f;
+            float num2 = (float)index % num;
+            float num3 = Mathf.Floor((float)index / num);
+            float num4 = num2 * 0.5f;
+            return new Vector2(615f, 100f) + new Vector2(num2 * 26f, (num3 + num4) * 18f);
+        }
+        return orig(self, index);
+    }
+
+
+
+
+
+
+
+    // 我决定让fp呆在原地不要动了，不然有点鬼畜
+    private delegate bool orig_EyesClosed(SSOracleBehavior self);
+    private static bool SSOracleBehavior_EyesClosed(orig_EyesClosed orig, SSOracleBehavior self)
+    {
+        var result = orig(self);
+        bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+        if (getModule && module.console != null && module.console.player != null)
+        {
+            result = !module.console.isActive;
+        }
+        return result;
+    }
+
+
+
+
+
+    // 珍珠会绕着猫转
+    // 但是效果没有我想象中那么好（。）所以先关了
+    private static void PebblesPearl_Update(On.PebblesPearl.orig_Update orig, PebblesPearl self, bool eu)
+    {
+        orig(self, eu);
+        if (self.hoverPos == null && self.oracle != null && self.oracle.room == self.room)
+        {
+            bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+            if (getModule && module.console != null && module.console.player != null && module.console.player.room == self.room)
+            {
+                if (!self.oracle.Consious) self.orbitObj = null;
+                // else if (module.console.isActive) self.orbitObj = module.console.player;
+                // else self.orbitObj = self.oracle;
+            }
+
+        }
+
+    }
+
+
 
 
 
@@ -168,20 +282,18 @@ public class SSOracleHooks
 
 
     // 这恐怕是唯一修改重力的办法了。。我很怀疑他会不会使得一些性能不太好的电脑掉帧
+    // 没事了 我找到另一个办法
     private delegate float orig_lowGravity(SSOracleBehavior.SubBehavior self);
     private static float SSOracleBehavior_SubBehavior_lowGravity(orig_lowGravity orig, SSOracleBehavior.SubBehavior self)
     {
         var result = orig(self);
-        if (self.oracle.room.game != null && self.oracle.room.game.session is StoryGameSession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
+        if (getModule && module.console != null && module.console.player != null)
         {
-            bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
-            if (getModule && module.console != null && module.console.player != null)
+            bool getModulep = Plugin.playerModules.TryGetValue(module.console.player, out var modulep) && modulep.playerName == Plugin.SlugcatStatsName;
+            if (getModulep && modulep.gravityController != null)
             {
-                bool getModulep = Plugin.playerModules.TryGetValue(module.console.player, out var modulep) && modulep.playerName == Plugin.SlugcatStatsName;
-                if (getModulep && modulep.gravityController != null)
-                {
-                    result = modulep.gravityController.gravityBonus * 0.1f;
-                }
+                result = modulep.gravityController.gravityBonus * 0.1f;
             }
         }
         return result;
@@ -249,15 +361,15 @@ public class SSOracleHooks
 
 
 
-
+    // 你说的对，但是
     private static void SSOracleBehavior_Update(On.SSOracleBehavior.orig_Update orig, SSOracleBehavior self, bool eu)
     {
         orig(self, eu);
         bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
-        if (getModule) 
+        if (getModule && self.oracle.ID == Oracle.OracleID.SS && self.oracle.room.game.IsStorySession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName) 
         {
             module.console?.Update(eu);
-            /*// 没辙了，我要使用一个非常烂的办法
+            /*// 这是另一种改变房间重力的方式，它好在可以显示出来重力变化（？）要不要这么干取决于我如何设计那个控制台
             if (module.console.player != null)
             {
                 bool getModulep = Plugin.playerModules.TryGetValue(module.console.player, out var modulep) && modulep.playerName == Plugin.SlugcatStatsName;
@@ -279,7 +391,11 @@ public class SSOracleHooks
     private static void SSOracleBehavior_SeePlayer(On.SSOracleBehavior.orig_SeePlayer orig, SSOracleBehavior self)
     {
         bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
-        if (getModule) return;
+        if (getModule && self.oracle.ID == Oracle.OracleID.SS)
+        {
+            self.NewAction(ActionID);
+            self.oracle.room.game.GetStorySession.saveState.miscWorldSaveData.SSaiConversationsHad = 0;
+        }
         else { orig(self); }
     }
 
@@ -288,70 +404,160 @@ public class SSOracleHooks
 
 
 
-
-    // 婴儿般的睡眠。jpg
-    private delegate bool orig_Consious(Oracle self);
-    private static bool Oracle_Consious(orig_Consious orig, Oracle self)
+    private static void SSOracleBehavior_NewAction(On.SSOracleBehavior.orig_NewAction orig, SSOracleBehavior self, SSOracleBehavior.Action nextAction)
     {
-        var result = orig(self);
-        if (self.room.game.session is StoryGameSession && self.ID == Oracle.OracleID.SS && (self.room.game.session as StoryGameSession).saveState.saveStateNumber == Plugin.SlugcatStatsName && (self.room.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding != true)
+        if (nextAction == ActionID)
         {
-            result = false;
-        }
-        return result;
-    }
+            if (self.currSubBehavior.ID == SubBehavID) return;
 
 
-
-
-
-
-    private static void SSOracleBehavior_ctor(On.SSOracleBehavior.orig_ctor orig, SSOracleBehavior self, Oracle oracle)
-    {
-        orig(self, oracle);
-        if (oracle.room.game.session is not StoryGameSession || oracle.room.game.GetStorySession.saveState.saveStateNumber != Plugin.SlugcatStatsName) return;
-        self.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
-
-
-    }
-
-
-
-
-
-
-    // 在这里挂模组（万物起源，如果有问题就关它
-    private static void Oracle_ctor(On.Oracle.orig_ctor orig, Oracle self, AbstractPhysicalObject abstractPhysicalObject, Room room) 
-    {
-        orig(self, abstractPhysicalObject, room);
-        if (self.room.game.session is StoryGameSession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
-        {
-            if (self.ID == Oracle.OracleID.SS)
+            SSOracleBehavior.SubBehavior subBehavior = null;
+            for (int i = 0; i < self.allSubBehaviors.Count; i++)
             {
-                Plugin.oracleModules.Add(self, new OracleModule(self));
+                if (self.allSubBehaviors[i].ID == SubBehavID)
+                {
+                    subBehavior = self.allSubBehaviors[i];
+                    break;
+                }
+            }
+            if (subBehavior == null)
+            {
+                subBehavior = new SSOracleSubBehavior(self);
+                self.allSubBehaviors.Add(subBehavior);
+            }
+            subBehavior.Activate(self.action, nextAction);
+            self.currSubBehavior.Deactivate();
+            Plugin.LogStat("Switching subbehavior to: " + subBehavior.ID.ToString() + " from: " + self.currSubBehavior.ID.ToString());
+            self.currSubBehavior = subBehavior;
+            self.inActionCounter = 0;
+            self.action = nextAction;
+            return;
+        }
+        else if (self.oracle.room.game.IsStorySession && self.oracle.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        {
+            
+            if (nextAction == self.action) return;
+            Plugin.LogStat("old action:", self.action.ToString(), "new action:", nextAction.ToString());
+
+            // 防止一切洗脑失败的情况（。）直接给你堵死。乐
+            nextAction = ActionID;
+
+        }
+        orig(self, nextAction);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    public static SSOracleBehavior.Action ActionID = new("PebblesSlug_Action", false);
+    public static SSOracleBehavior.SubBehavior.SubBehavID SubBehavID = new("PebblesSlug_SubBehavior", false);
+    public static Conversation.ID ConversationID = new("PebblesSlug_Conversation", false);
+
+}
+
+
+
+
+
+
+// 好好好，我写，我写行了吧
+// 我该给这个类起什么名字。。
+// 啊这，难道拼写错误也是代码命名规则的一部分嘛……
+// 我猜想这样写完之后能通过调整mod的启用顺序，来解决在我的存档里玩机猫会触发机猫剧情的问题（？
+public class SSOracleSubBehavior : SSOracleBehavior.ConversationBehavior
+{
+    public bool firstMetOnThisCycle;
+
+    public float lastGetToWork;
+
+    public float tagTimer;
+    private PlayerModule PlayerModule;
+
+
+    // 千万别调用convoID，因为它是我瞎写的占位符，啥也不是
+    public SSOracleSubBehavior(SSOracleBehavior owner) : base(owner, SSOracleHooks.SubBehavID, SSOracleHooks.ConversationID)
+    {
+        if (oracle.ID != Oracle.OracleID.SS) return;
+        Plugin.Log("SSoracleBehavior - subBehavior ctor");
+        this.owner.TurnOffSSMusic(true);
+
+        if (base.player != null && base.player.room != null && base.player.room == this.owner.oracle.room) 
+        {
+            PlayerModule = (Plugin.playerModules.TryGetValue(base.player, out var module) && module.playerName == Plugin.SlugcatStatsName) ? module : null;
+        }
+        if (this.owner.conversation != null)
+        {
+            this.owner.conversation.Destroy();
+            this.owner.conversation = null;
+        }
+        this.owner.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
+
+    }
+
+
+    public override void Update()
+    {
+        base.Update();
+        if (base.player == null)
+        {
+            return;
+        }
+        owner.movementBehavior = SSOracleBehavior.MovementBehavior.Meditate;
+        if (tagTimer > 0f && owner.inspectPearl != null)
+        {
+            owner.killFac = Mathf.Clamp(tagTimer / 120f, 0f, 1f);
+            tagTimer -= 1f;
+            if (tagTimer <= 0f)
+            {
+                for (int i = 0; i < 20; i++)
+                {
+                    oracle.room.AddObject(new Spark(owner.inspectPearl.firstChunk.pos, Custom.RNV() * Random.value * 40f, new Color(1f, 1f, 1f), null, 30, 120));
+                }
+                oracle.room.PlaySound(SoundID.SS_AI_Give_The_Mark_Boom, owner.inspectPearl.firstChunk.pos, 1f, 0.5f + Random.value * 0.5f);
+                owner.killFac = 0f;
             }
         }
-        
-
     }
 
 
 
 
-
-    // 垃圾回收
-    private static void Oracle_Destroy(On.Oracle.orig_Destroy orig, Oracle self)
+    public override Vector2? LookPoint
     {
-        if (self.ID == Oracle.OracleID.SS) 
+        get 
         {
-            bool getModule = Plugin.oracleModules.TryGetValue(self, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;
-            if (getModule)
+            if (base.player == null) return null;
+            if (PlayerModule != null && PlayerModule.console != null && PlayerModule.console.isActive)
             {
-                module.console.Destroy();
-                module.console.hud.ClearSprites();
-                module.console.hud = null;
-                module.console = null;
+                return base.player.mainBodyChunk.pos;
             }
+            return null;
+        }
+    }
+
+
+
+
+    public override float LowGravity
+    {
+        get
+        {
+            if (PlayerModule != null && PlayerModule.gravityController != null)
+            {
+                return PlayerModule.gravityController.gravityBonus * 0.1f;
+            }
+            return -1f;
         }
     }
 
@@ -361,6 +567,31 @@ public class SSOracleHooks
 
 
 
+
+
+    public override void Deactivate()
+    {
+        base.Deactivate();
+    }
+
+
+
+    public override void Activate(SSOracleBehavior.Action oldAction, SSOracleBehavior.Action newAction)
+    {
+        base.Activate(oldAction, newAction);
+    }
+
+
+
+    /*public override void NewAction(SSOracleBehavior.Action oldAction, SSOracleBehavior.Action newAction)
+    {
+        base.NewAction(oldAction, newAction);
+        if (newAction == SSOracleBehavior.Action.ThrowOut_KillOnSight && this.owner.conversation != null)
+        {
+            this.owner.conversation.Destroy();
+            this.owner.conversation = null;
+        }
+    }*/
 
 
 }
