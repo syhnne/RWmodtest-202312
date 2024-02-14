@@ -19,18 +19,18 @@
 
 		"auto_grab_batflies": false,
 		"back_spear": false,
-		"weight": [ 1.1, 1.0 ],
+		"weight": [ 1.1, 0.9 ],
 		"lung_capacity": [ 0.6, 0.3 ],
 		"walk_speed": 1.4,
 		"climb_speed": 1.4,
 		"tunnel_speed": 1.5,
 		"throw_skill": [ 1.0, 0.7 ],
-		"crouch_stealth": [ 1.0, 0.6 ],
+		"crouch_stealth": [ 1.0, 0.7 ],
 
 
 
-		"karma": 9,
-		"karma_cap": 9,
+		"karma": 0,
+		"karma_cap": 5,
 		"the_mark": true,
 		"the_glow": true,
 		"cycle_length_min": 9,
@@ -50,12 +50,12 @@
 			}
 		},
 		"alignments": {
-			"Scavengers": { "like": -0.9 },
-			"Lizards": { "like": -0.9 },
-			"Cicadas": { "like": -0.9 },
-			"Deer": { "like": -0.9 },
-			"GarbageWorms": { "like": -0.9 },
-			"JetFish": { "like": -0.9 }
+			"Scavengers": { "like": -0.95 },
+			"Lizards": { "like": -0.95 },
+			"Cicadas": { "like": -0.95 },
+			"Deer": { "like": -0.95 },
+			"GarbageWorms": { "like": -0.95 },
+			"JetFish": { "like": -0.95 }
 		}
 	}
 

@@ -405,7 +405,9 @@ public class CustomLore
             Plugin.Log("Beat Game Mode(alt ending) : ", (game.GetStorySession.saveState?.ToString()));
             // game.rainWorld.progression.miscProgressionData.beaten_（） = true;
             // 下面这个不要了，不出意外的话打完真结局会有类似功能
-            // game.GetStorySession.saveState.deathPersistentSaveData.karma = game.GetStorySession.saveState.deathPersistentSaveData.karmaCap;
+            // 没事了 那个被我砍了
+            game.GetStorySession.saveState.deathPersistentSaveData.karmaCap = 9;
+            game.GetStorySession.saveState.deathPersistentSaveData.karma = 9;
             game.GetStorySession.saveState.deathPersistentSaveData.altEnding = true;
             game.GetStorySession.saveState.BringUpToDate(game);
             AbstractCreature abstractCreature = game.FirstAlivePlayer;

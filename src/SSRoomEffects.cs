@@ -15,8 +15,9 @@ namespace PebblesSlug;
 
 /// <summary>
 /// 在打完结局前关闭五卵石内部的任何特效
-/// 下一作说不定还要用这些代码（
 /// </summary>
+/// 
+/// 下一作说不定还要用这些代码（
 internal class SSRoomEffects
 
 
