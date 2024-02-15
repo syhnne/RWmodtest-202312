@@ -447,7 +447,7 @@ public class CustomLore
 
     private static void Room_Loaded(On.Room.orig_Loaded orig, Room self)
     {
-        if (self.abstractRoom.name == "SS_AI")
+        if (self.abstractRoom.name == "SS_AI" && self.game.IsStorySession && self.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
         {
             Plugin.Log("Room_Loaded: SS_AI room specific script added !");
             self.roomSettings.roomSpecificScript = true;
@@ -505,6 +505,8 @@ internal class RoomSpecificScripts
             room.AddObject(new SS_PebblesStartCutscene(room));
         }
 
+        // 典中典之忘写orig
+        orig(room);
     }
 
 

@@ -33,6 +33,8 @@ using System.Runtime.CompilerServices;
 using IL.Menu;
 using HUD;
 using MonoMod.Utils;
+using System.IO;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace PebblesSlug;
 
@@ -163,6 +165,7 @@ class Plugin : BaseUnityPlugin
             RoomSpecificScripts.Apply();
             ShelterSS_AI.Apply();
             SSRoomEffects.Apply();
+            OverseerHolograms_.Apply();
 
             On.Player.ClassMechanicsArtificer += Player_ClassMechanicsArtificer;
             On.Player.CraftingResults += Player_CraftingResults;
@@ -211,11 +214,11 @@ class Plugin : BaseUnityPlugin
             // On.Menu.SlugcatSelectMenu.SlugcatPageContinue.Update += Menu_SlugcatSelectMenu_SlugcatPageContinue_Update;
             IL.ProcessManager.CreateValidationLabel += ProcessManager_CreateValidationLabel;
 
-
-            new Hook(
+            // 好了，改完了。简单粗暴（
+            /*new Hook(
             typeof(RedsIllness).GetProperty(nameof(RedsIllness.FoodToBeOkay), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
             RedsIllness_FoodToBeOkay
-            );
+            );*/
 
             new Hook(
             typeof(RedsIllness).GetProperty(nameof(RedsIllness.FoodFac), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
@@ -256,22 +259,25 @@ class Plugin : BaseUnityPlugin
 
     }
 
-    
+
 
     private void LoadResources(RainWorld rainWorld)
     {
         try
         {
-            MachineConnector.SetRegisteredOI("PebblesSlug_by_syhnne", this.option);
+            MachineConnector.SetRegisteredOI("PebblesSlug_by_syhnne", option);
             
-            bool isInit = this.IsInit;
+            bool isInit = IsInit;
             if (!isInit)
             {
                 LogStat("INIT");
-                this.IsInit = true;
+                IsInit = true;
                 Futile.atlasManager.LoadAtlas("atlases/fp_head");
                 Futile.atlasManager.LoadAtlas("atlases/fp_tail");
                 Futile.atlasManager.LoadAtlas("atlases/fp_arm");
+
+                Futile.atlasManager.LoadImage("overseerHolograms/PebblesSlugHologram");
+                // Futile.atlasManager.LogAllElementNames();
             }
         }
         catch (Exception ex)

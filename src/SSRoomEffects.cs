@@ -118,10 +118,10 @@ internal class SSRoomEffects
                 // 擦 原来gravityDisrupter那个巨大的动静是底下这个 怪不得老挪不掉 看名字谁看得出来啊（。
                 settings.RemoveAmbientSound(AmbientSound.Type.Spot, "SO_SFX-Escape.ogg");
 
-                foreach (AmbientSound sound in settings.ambientSounds)
+                /*foreach (AmbientSound sound in settings.ambientSounds)
                 {
                     Plugin.Log("room:", self.name, "ambientSound:", sound.type.ToString(), sound.sample);
-                }
+                }*/
 
             }
         }

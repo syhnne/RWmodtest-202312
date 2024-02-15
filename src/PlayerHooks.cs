@@ -119,11 +119,16 @@ internal class PlayerHooks
             if (console != null && player.room.abstractRoom.name == "SS_AI" && player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding
                 && Input.GetKeyDown(Plugin.instance.option.fpConsoleKey.Value))
             {
-                console.isActive = !console.isActive;
+
+                // 控制台功能我懒得做了，先关掉（
+                /*Plugin.LogStat("toggle console active: ", console.isActive);
+                console.isActive = !console.isActive;*/
+
+
                 // 没想好怎么让他移动，先不关这个了
                 // lockInput = console.isActive;
                 
-                Plugin.LogStat("toggle console active: ", console.isActive);
+                
             }
 
             /*if (gravityController != null)
