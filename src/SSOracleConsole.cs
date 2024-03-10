@@ -54,7 +54,7 @@ public class SSOracleConsole : UpdatableAndDeletable
             }
             if (!findPlayer)
             {
-                Plugin.Log("SSOracleConsole - WARNING: pebbles slugcat not in game");
+                // Plugin.Log("SSOracleConsole - WARNING: pebbles slugcat not in game");
                 return;
             }
             bool getModule = Plugin.playerModules.TryGetValue(player, out var module) && module.playerName == Plugin.SlugcatStatsName;

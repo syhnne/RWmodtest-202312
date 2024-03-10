@@ -387,7 +387,7 @@ public class SSOracleHooks
 
 
 
-    // 让fp无视你的大部分行为（这不包括用武器攻击他
+    // 让fp无视你的大部分行为
     private static void SSOracleBehavior_SeePlayer(On.SSOracleBehavior.orig_SeePlayer orig, SSOracleBehavior self)
     {
         bool getModule = Plugin.oracleModules.TryGetValue(self.oracle, out var module) && module.ownerSlugcatName == Plugin.SlugcatStatsName;

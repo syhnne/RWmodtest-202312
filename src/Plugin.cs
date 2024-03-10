@@ -51,7 +51,7 @@ namespace PebblesSlug;
 
 
 /// <summary>
-/// 吾日三省吾身：orig(self)写了吗？null检查了吗？hook挂上了吗？
+/// 吾日三省吾身：orig(player)写了吗？null检查了吗？hook挂上了吗？
 /// </summary>
 
 
@@ -83,7 +83,7 @@ class Plugin : BaseUnityPlugin
     internal static readonly int Cycles = 21;
     internal static readonly int MaxFood = 8;
     internal static readonly int MinFood = 5;
-    internal int MinFoodNow = 5;
+    internal int MinFoodNow = MinFood;
 
     internal static readonly Color32 bodyColor_hard = new Color32(254, 104, 202, 255);
     internal static readonly Color eyesColor_hard = new Color(1f, 1f, 1f);
@@ -177,14 +177,19 @@ class Plugin : BaseUnityPlugin
             On.Player.GraspsCanBeCrafted += Player_GraspsCanBeCrafted;
             // On.Player.SwallowObject += Player_SwallowObject;
             On.Player.SpitUpCraftedObject += Player_SpitUpCraftedObject;
-            IL.Player.GrabUpdate += Player_GrabUpdate;
+            // On.Player.GrabUpdate += Player_GrabUpdate;
+            IL.Player.GrabUpdate += IL_Player_GrabUpdate;
             On.Creature.Violence += Creature_Violence;
             On.Player.CanBeSwallowed += Player_CanBeSwallowed;
             On.Player.ThrownSpear += Player_ThrownSpear;
             On.Player.Jump += Player_Jump;
+            On.SlugcatStats.ctor += SlugcatStats_ctor;
             // On.Player.AddFood += Player_AddFood;
-            // On.Player.GrabUpdate += Player_GrabUpdate;
-            IL.Player.EatMeatUpdate += Player_EatMeatUpdate;
+
+            IL.Player.EatMeatUpdate += IL_Player_EatMeatUpdate;
+            // On.Player.UpdateAnimation += Player_UpdateAnimation;
+            // IL.Player.BiteEdibleObject += IL_Player_BiteEdibleObject;
+            On.Player.BiteEdibleObject += Player_BiteEdibleObject;
 
             On.Player.ctor += Player_ctor;
             // On.RainWorldGame.ctor += RainWorldGame_ctor;
@@ -201,7 +206,7 @@ class Plugin : BaseUnityPlugin
             // On.UnderwaterShock.Update += UnderwaterShock_Update;
             IL.ZapCoil.Update += IL_ZapCoil_Update;
             
-            IL.Centipede.Shock += Centipede_Shock;
+            IL.Centipede.Shock += IL_Centipede_Shock;
 
             
 
@@ -215,8 +220,8 @@ class Plugin : BaseUnityPlugin
 
             On.RegionGate.customKarmaGateRequirements += RegionGate_customKarmaGateRequirements;
 
-            IL.HUD.Map.CycleLabel.UpdateCycleText += HUD_Map_CycleLabel_UpdateCycleText;
-            IL.HUD.SubregionTracker.Update += HUD_SubregionTracker_Update;
+            IL.HUD.Map.CycleLabel.UpdateCycleText += IL_HUD_Map_CycleLabel_UpdateCycleText;
+            IL.HUD.SubregionTracker.Update += IL_HUD_SubregionTracker_Update;
             // IL.ProcessManager.CreateValidationLabel += ProcessManager_CreateValidationLabel;
             IL.Menu.SlugcatSelectMenu.SlugcatPageContinue.ctor += Menu_SlugcatSelectMenu_SlugcatPageContinue_ctor;
             // On.Menu.SlugcatSelectMenu.SlugcatPageContinue.Update += Menu_SlugcatSelectMenu_SlugcatPageContinue_Update;
@@ -625,7 +630,7 @@ class Plugin : BaseUnityPlugin
     }
 
 
-    private void Player_GrabUpdate(On.Player.orig_GrabUpdate orig, Player self, bool eu)
+    /*private void Player_GrabUpdate(On.Player.orig_GrabUpdate orig, Player self, bool eu)
     {
         orig(self, eu);
         if (self.slugcatStats.name == Plugin.SlugcatStatsName)
@@ -638,12 +643,12 @@ class Plugin : BaseUnityPlugin
                 }
             }
         }
-    }
+    }*/
 
 
     // 经测试，这个饱食度设定只在自己存档，或者自己是玩家1的时候生效，所以我需要自己重写一遍
     // 悲伤的是这个东西不生效
-    private void Player_EatMeatUpdate(ILContext il)
+    private void IL_Player_EatMeatUpdate(ILContext il)
     {
         ILCursor c = new(il);
         // 654 修改判定
@@ -697,7 +702,7 @@ class Plugin : BaseUnityPlugin
         if (self.player.slugcatStats.name.value == SlugcatName)
         {
             // 还是那个同款函数
-            /*int r = 1 + (int)Math.Floor((float)(self.cycle+5) / Cycles * (MaxFood + 1 - MinFood));
+            /*int r = 1 + (int)Math.Floor((float)(player.cycle+5) / Cycles * (MaxFood + 1 - MinFood));
             result = 1f / (float)r;*/
             result = Mathf.Max(0.2f, 1f / ((float)self.cycle * 0.25f + 2f));
         }
@@ -822,7 +827,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 修改游戏内显示的雨循环倒计时
-    private void HUD_SubregionTracker_Update(ILContext il)
+    private void IL_HUD_SubregionTracker_Update(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 164 修改是否是红猫的判定
@@ -874,7 +879,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 不知道这个是干嘛的，但既然搜索搜出来了就改一下罢
-    private void HUD_Map_CycleLabel_UpdateCycleText(ILContext il)
+    private void IL_HUD_Map_CycleLabel_UpdateCycleText(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 23 修改判定
@@ -971,7 +976,7 @@ class Plugin : BaseUnityPlugin
             Menu.SleepAndDeathScreen owner = (self.hud.owner as Menu.SleepAndDeathScreen);
             if (CycleGetFood(package.saveState.cycleNumber - 1) < CycleGetFood(package.saveState.cycleNumber))
             {
-                // Plugin.LogStat("HUD_FoodMeter_SleepUpdate - FOOD CHANGING survival limit: ", self.survivalLimit, " start malnourished: ", owner.startMalnourished);
+                // Plugin.LogStat("HUD_FoodMeter_SleepUpdate - FOOD CHANGING survival limit: ", player.survivalLimit, " start malnourished: ", owner.startMalnourished);
                 owner.startMalnourished = true;
                 // 强制玩家观看动画。反正占不了他们几秒，但我可是做了一下午，都给我看（
                 if (CycleGetFood(package.saveState.cycleNumber) == MinFood + 1)
@@ -1068,6 +1073,14 @@ class Plugin : BaseUnityPlugin
 
 
 
+    private void SlugcatStats_ctor(On.SlugcatStats.orig_ctor orig, SlugcatStats self, SlugcatStats.Name slugcat, bool malnourished)
+    {
+        orig(self, slugcat, malnourished);
+        if (slugcat == Plugin.SlugcatStatsName)
+        {
+            self.foodToHibernate = MinFoodNow;
+        }
+    }
 
 
 
@@ -1076,8 +1089,48 @@ class Plugin : BaseUnityPlugin
 
 
 
+    // 房间发生变化时保留重力变化
+    private void Player_NewRoom(On.Player.orig_NewRoom orig, Player self, Room newRoom)
+    {
+        orig(self, newRoom);
+        bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
+        if (getModule && self.slugcatStats.name == SlugcatStatsName)
+        {
+            bool isMyStory = newRoom.game.IsStorySession && newRoom.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName;
+            module.gravityController?.NewRoom(isMyStory);
 
 
+            if (newRoom.abstractRoom.name == "SS_AI" && CustomLore.DPSaveData != null && CustomLore.DPSaveData.saveStateNumber == Plugin.SlugcatStatsName)
+            {
+                CustomLore.DPSaveData.CyclesFromLastEnterSSAI = 0;
+                Plugin.LogStat("CustomLore.DPSaveData.CyclesFromLastEnterSSAI CLEEARED");
+            }
+
+            if (self.room == null) { return; }
+            if (module.console != null)
+            {
+                if (self.room.abstractRoom.name != "SS_AI")
+                {
+                    module.console.isActive = false;
+                }
+                else if (isMyStory && newRoom.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+                {
+                    module.console.Enter();
+                }
+            }
+
+
+            // logs
+            if (!DevMode) return;
+
+            Plugin.LogStat("ROOM: ", self.room.abstractRoom.name, " SHELTER INDEX: ", self.room.abstractRoom.shelterIndex);
+            if (self.room.abstractRoom.isAncientShelter) { Plugin.LogStat("IS ANCIENT SHELTER"); }
+
+            Plugin.Log("CustomLore.DPSaveData.CyclesFromLastEnterSSAI:", CustomLore.DPSaveData.CyclesFromLastEnterSSAI, CustomLore.DPSaveData.saveStateNumber.value);
+
+            Plugin.Log("self.slugcatStats.foodToHibernate:", self.slugcatStats.foodToHibernate);
+        }
+    }
 
 
 
@@ -1122,10 +1175,6 @@ class Plugin : BaseUnityPlugin
 
 
 
-
-
-
-
     // 随着游戏进度修改游戏内饱食度，不出意外的话，打真结局后就不会再改了
     private void Player_ctor(On.Player.orig_ctor orig, Player self, AbstractCreature abstractCreature, World world)
     {
@@ -1134,7 +1183,7 @@ class Plugin : BaseUnityPlugin
         orig(self, abstractCreature, world);
         
 
-        if (world.game.IsStorySession && self.slugcatStats.name.value == SlugcatName)
+        if (world.game.IsStorySession && self.slugcatStats.name == SlugcatStatsName)
         {
             playerModules.Add(self, new PlayerModule(self));
             
@@ -1149,34 +1198,52 @@ class Plugin : BaseUnityPlugin
             // (world.game.session as StoryGameSession).saveState.hasRobo = true;
             int cycle = (world.game.session as StoryGameSession).saveState.cycleNumber;
             bool altEnding = (world.game.session as StoryGameSession).saveState.deathPersistentSaveData.altEnding;
-            LogStat("Player_ctor - cycle: ", cycle.ToString()," altEnding: ", altEnding.ToString());
-            if (cycle > 5 && !altEnding)
+            bool ascended = (world.game.session as StoryGameSession).saveState.deathPersistentSaveData.ascended;
+
+            LogStat("Player_ctor - cycle: ", cycle," altEnding: ", altEnding, "ascended:", ascended);
+
+
+
+            // 懂了，在挂香菇病效果之前计算，如果这时候就有malnourished，说明是挨饿的，否则就不是
+            MinFoodNow = MinFood;
+            self.slugcatStats.maxFood = MaxFood;
+            if (self.Malnourished)
+            {
+                MinFoodNow = MaxFood;
+            }
+            else if (!altEnding && !ascended)
+            {
+                MinFoodNow = Math.Min(CycleGetFood(cycle), MaxFood);
+            }
+
+
+
+
+            if (!altEnding && !ascended && cycle > 5)
             {
                 self.redsIllness = new RedsIllness(self, cycle - 5);
             }
-
-            // 以下这几句看似没用，实则可以防止删除存档后继承上一把的食物条。
-            // 我对于这个bug是如何出现的，完全没有任何头绪。总之，加上这几句就对了，别改了，输出日志也最好别删。
-            if (!self.Malnourished || self.slugcatStats.foodToHibernate != MaxFood)
+            else if (altEnding && !ascended && CustomLore.DPSaveData != null && CustomLore.DPSaveData.CyclesFromLastEnterSSAI > 5)
             {
-                self.slugcatStats.foodToHibernate = MinFood;
+                // 在想打完altending之后还要不要加饱食度变化 加的话会很麻烦 对于我和玩家来说都很麻烦（。
+                self.redsIllness = new RedsIllness(self, CustomLore.DPSaveData.CyclesFromLastEnterSSAI - 5);
             }
-            MinFoodNow = MinFood;
-            self.slugcatStats.maxFood = MaxFood;
 
-            Plugin.LogStat("Player_ctor - food to hibernate(before): ", self.slugcatStats.foodToHibernate);
+
+            
+
             if (!altEnding) 
-            { 
-                MinFoodNow = Math.Min(CycleGetFood(cycle), MaxFood);
+            {
                 // 以防挨饿之后他覆盖挨饿的饱食度
                 // 我有一个猜想，redsillness会给玩家挂上malnourished属性，这导致在后来的某个函数里，foodToHibernate又变成了最大食物数
                 // 然而游戏里又藏了一些别的代码，使得我达到foodToBeOkay之后这个值又恢复正常了。。
                 // 总之，我不管了，玩家可能会自己发现这个让他们高兴的事实：即便你前一天晚上挨饿睡觉，第二天也不用吃8个食物就能恢复正常
                 // TODO: 但是能修还是修一下
-                if (self.slugcatStats.foodToHibernate != MaxFood)
-                {
-                    self.slugcatStats.foodToHibernate = Math.Min(MinFoodNow, MaxFood);
-                }
+
+                // 他妈的，放着不修的下场就是他不知道什么时候变成了foodToHibernate永远都是8，测试的时候差点没给我折磨死
+                // 见鬼的slugcatstats为什么在我playerctor前后都要调用，还要调用好几次
+                // 今天跟你爆了
+                self.slugcatStats.foodToHibernate = MinFoodNow;
                 Plugin.LogStat("Player_ctor - minfoodnow: ", MinFoodNow, "food to hibernate(after): ", self.slugcatStats.foodToHibernate, " maxfood: ", MaxFood);
             }
             
@@ -1247,46 +1314,7 @@ class Plugin : BaseUnityPlugin
 
 
 
-    // 房间发生变化时保留重力变化
-    private void Player_NewRoom(On.Player.orig_NewRoom orig, Player self, Room newRoom)
-    {
-        orig(self, newRoom);
-        bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
-        if (getModule && self.slugcatStats.name == SlugcatStatsName)
-        {
-            bool isMyStory = newRoom.game.IsStorySession && newRoom.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName;
-            module.gravityController?.NewRoom(isMyStory);
-
-
-            if (newRoom.abstractRoom.name == "SS_AI" && CustomLore.DPSaveData != null && CustomLore.DPSaveData.saveStateNumber == Plugin.SlugcatStatsName)
-            {
-                CustomLore.DPSaveData.CyclesFromLastEnterSSAI = 0;
-                Plugin.LogStat("CustomLore.DPSaveData.CyclesFromLastEnterSSAI CLEEARED");
-            }
-
-            if (self.room == null) { return; }
-            if (module.console != null)
-            {
-                if (self.room.abstractRoom.name != "SS_AI")
-                {
-                    module.console.isActive = false;
-                }
-                else if (isMyStory && newRoom.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
-                {
-                    module.console.Enter();
-                }
-            }
-            
-
-            // logs
-            if (!DevMode) return;
-
-            Plugin.LogStat("ROOM: ", self.room.abstractRoom.name, " SHELTER INDEX: ", self.room.abstractRoom.shelterIndex);
-            if (self.room.abstractRoom.isAncientShelter) { Plugin.LogStat("IS ANCIENT SHELTER"); }
-
-            Plugin.Log("CustomLore.DPSaveData.CyclesFromLastEnterSSAI:", CustomLore.DPSaveData.CyclesFromLastEnterSSAI, CustomLore.DPSaveData.saveStateNumber.value);
-        }
-    }
+    
 
 
 
@@ -1295,16 +1323,16 @@ class Plugin : BaseUnityPlugin
 
     // 这才是设定上真正修改重力的家伙
     // 卧槽，他卡bug
-    /*private void GravityDisruptor_Update(On.GravityDisruptor.orig_Update orig, GravityDisruptor self, bool eu)
+    /*private void GravityDisruptor_Update(On.GravityDisruptor.orig_Update orig, GravityDisruptor player, bool eu)
     {
         try
         {
-            orig(self, eu);
-            if (self.room != null && self.room.game != null
-                && self.room.game.session is StoryGameSession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName
-                && self.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) == null)
+            orig(player, eu);
+            if (player.room != null && player.room.game != null
+                && player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName
+                && player.room.roomSettings.GetEffect(RoomSettings.RoomEffect.Type.BrokenZeroG) == null)
             {
-                self.power = 1f - self.room.gravity;
+                player.power = 1f - player.room.gravity;
             }
         }
         catch (Exception e)
@@ -1376,7 +1404,7 @@ class Plugin : BaseUnityPlugin
     private bool SLOracleSwarmer_Edible(orig_SLOracleSwarmerEdible orig, SLOracleSwarmer self)
     {
         var result = orig(self);
-        if (self.grabbedBy[0] != null && self.grabbedBy[0].grabber is Player && (self.grabbedBy[0].grabber as Player).slugcatStats.name == Plugin.SlugcatStatsName)
+        if (self.grabbedBy.Count > 0 && self.grabbedBy[0] != null && self.grabbedBy[0].grabber is Player && (self.grabbedBy[0].grabber as Player).slugcatStats.name == Plugin.SlugcatStatsName)
         {
             result = false;
         }
@@ -1389,7 +1417,7 @@ class Plugin : BaseUnityPlugin
     private bool SSOracleSwarmer_Edible(orig_SSOracleSwarmerEdible orig, SSOracleSwarmer self)
     {
         var result = orig(self);
-        if (self.grabbedBy[0] != null && self.grabbedBy[0].grabber is Player && (self.grabbedBy[0].grabber as Player).slugcatStats.name == Plugin.SlugcatStatsName)
+        if (self.grabbedBy.Count > 0 && self.grabbedBy[0] != null && self.grabbedBy[0].grabber is Player && (self.grabbedBy[0].grabber as Player).slugcatStats.name == Plugin.SlugcatStatsName)
         {
             result = false;
         }
@@ -1476,7 +1504,7 @@ class Plugin : BaseUnityPlugin
     // 我大概应该用原版方法，然后做ilhooking。但是，说真的，想想那个工作量吧（汗）我都不太清楚自己究竟改了些什么
     private void Player_ClassMechanicsArtificer(On.Player.orig_ClassMechanicsArtificer orig, Player self)
     {
-        // Log("slugcat name: "+ self.slugcatStats.name.value);
+        // Log("slugcat name: "+ player.slugcatStats.name.value);
         if (self.slugcatStats.name.value == SlugcatName)
         {
             Room room = self.room;
@@ -1672,10 +1700,10 @@ class Plugin : BaseUnityPlugin
                 }
                 self.room.AddObject(new ShockWave(pos2, 200f, 0.2f, 6, false));
                 self.room.AddObject(new ZapCoil.ZapFlash(pos2, 10f));
-                // self.room.PlaySound(SoundID.Flare_Bomb_Burn, pos2);
-                // self.room.PlaySound(SoundID.Zapper_Zap, pos2, 1f, 0.2f + 0.25f * Random.value);
+                // player.room.PlaySound(SoundID.Flare_Bomb_Burn, pos2);
+                // player.room.PlaySound(SoundID.Zapper_Zap, pos2, 1f, 0.2f + 0.25f * Random.value);
                 self.room.PlaySound(SoundID.Zapper_Zap, pos2, 1f, 1f + 0.25f * Random.value);
-                // self.room.PlaySound(SoundID.Fire_Spear_Explode, pos2, 0.3f + Random.value * 0.3f, 0.5f + Random.value * 2f);
+                // player.room.PlaySound(SoundID.Fire_Spear_Explode, pos2, 0.3f + Random.value * 0.3f, 0.5f + Random.value * 2f);
                 self.room.InGameNoise(new InGameNoise(pos2, 8000f, self, 1f));
 
                 if (self.room.Darkness(pos2) > 0f)
@@ -2002,11 +2030,69 @@ class Plugin : BaseUnityPlugin
 
 
 
+    private void Player_BiteEdibleObject(On.Player.orig_BiteEdibleObject orig, Player self, bool eu)
+    {
+        if (self.slugcatStats.name == Plugin.SlugcatStatsName && self.grasps[0] != null && self.grasps[1] != null
+            && (self.grasps[0].grabbed is SSOracleSwarmer || self.grasps[0].grabbed is SLOracleSwarmer) && self.grasps[1].grabbed is IPlayerEdible)
+        {
+            if ((self.grasps[1].grabbed as IPlayerEdible).BitesLeft == 1 && self.SessionRecord != null)
+            {
+                self.SessionRecord.AddEat(self.grasps[1].grabbed);
+            }
+            if (self.grasps[1].grabbed is Creature)
+            {
+                (self.grasps[1].grabbed as Creature).SetKillTag(self.abstractCreature);
+            }
+            if (self.graphicsModule != null)
+            {
+                (self.graphicsModule as PlayerGraphics).BiteFly(1);
+            }
+            (self.grasps[1].grabbed as IPlayerEdible).BitByPlayer(self.grasps[1], eu);
+            return;
+        }
+        else { orig(self, eu); }
 
- 
+    }
 
 
 
+
+    // 这代码看得我两眼一黑
+    // 我现在就要
+    // 重构代码（扯衣服。jpg
+    // 卧槽。什么情况。为什么一执行委托就报错。我寻思我也妹打错字啊。
+    private void IL_Player_BiteEdibleObject(ILContext il)
+    {
+        ILCursor c3 = new ILCursor(il);
+        // 13
+        if (c3.TryGotoNext(MoveType.After,
+            (i) => i.MatchCall<Creature>("get_grasps"),
+            (i) => i.Match(OpCodes.Ldloc_0),
+            (i) => i.Match(OpCodes.Ldelem_Ref),
+            (i) => i.Match(OpCodes.Ldfld),
+            (i) => i.Match(OpCodes.Isinst)
+            ))
+        {
+            /*c3.Emit(OpCodes.Ldarg_0);
+            c3.Emit(OpCodes.Ldloc_0);
+            c3.EmitDelegate<Func<bool, Player, int, bool>>((edible, player, grasp) =>
+            {
+                if (player.slugcatStats.name == SlugcatStatsName)
+                {
+                    bool isNotOracleSwarmer = player.grasps[grasp] != null && player.grasps[grasp].grabbed != null && player.grasps[grasp].grabbed is not OracleSwarmer;
+                    return (edible && isNotOracleSwarmer);
+                }
+                else
+                {
+                    return edible;
+                }
+            });*/
+            c3.EmitDelegate<Func<bool, bool>>((edible) =>
+            {
+                return edible;
+            });
+        }
+    }
 
 
 
@@ -2014,7 +2100,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 修改神经元的可食用性和合成判定
-    private void Player_GrabUpdate(ILContext il)
+    private void IL_Player_GrabUpdate(ILContext il)
     {
         ILCursor c = new ILCursor(il);
         // 337末尾，修改神经元的可食用性。没错，我要借用一下他自带的那个brfalse。。因为我自己不会写！！
@@ -2034,7 +2120,7 @@ class Plugin : BaseUnityPlugin
             c.Emit(OpCodes.Ldloc, 13);
             c.EmitDelegate<Func<bool, Player, int, bool>>((edible, self, grasp) =>
             {
-                if (self.slugcatStats.name.value == SlugcatName)
+                if (self.slugcatStats.name == SlugcatStatsName)
                 {
                     bool isNotOracleSwarmer = !(self.grasps[grasp].grabbed is OracleSwarmer);
                     return (edible && isNotOracleSwarmer);
@@ -2062,7 +2148,7 @@ class Plugin : BaseUnityPlugin
             c2.Emit(OpCodes.Ldarg_0);
             c2.EmitDelegate<Func<bool, Player, bool>>((isArtificer, self) =>
             {
-                if (self.slugcatStats.name.value == SlugcatName)
+                if (self.slugcatStats.name == SlugcatStatsName)
                 {
                     // 这么做是为了防止误触，因为我自己特么的误触好几次了，我想吃东西来着结果吃到刚才用来鲨人的矛，反倒吐了两格
                     if (Plugin.instance.option.CraftKey.Value == KeyCode.None) return true;
@@ -2163,7 +2249,7 @@ class Plugin : BaseUnityPlugin
 
 
     // 同理，现在可以免疫蜈蚣的电击，甚至吃上一顿
-    private void Centipede_Shock(ILContext il)
+    private void IL_Centipede_Shock(ILContext il)
     {
          ILCursor c = new ILCursor(il);
         // 226，还是那个劫持判定，修改蜈蚣的体重让他无论如何都会小于玩家体重
