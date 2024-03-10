@@ -94,7 +94,7 @@ internal class PlayerHooks
 
             if (playerName == Plugin.SlugcatStatsName && storyName != null)
             {
-                Plugin.Log("gravityController added!");
+                Plugin.LogStat("gravityController added!");
                 gravityController = new GravityController(player);
             }
             if (isPebbles)

@@ -19,11 +19,18 @@ using Menu;
 using System.IO;
 using System.Security.Cryptography;
 using UnityEngine.Rendering;
+using System.Text.RegularExpressions;
+using UnityEngine.Diagnostics;
+using System.Runtime.Remoting.Messaging;
 
 
 
 
 namespace PebblesSlug;
+
+
+
+
 
 
 
@@ -36,6 +43,7 @@ public class CustomLore
     static MenuScene.SceneID altEndingScene = new MenuScene.SceneID("AltEnding_PebblesSlug");
     static SlideShow.SlideShowID altEndingSlideshow = new SlideShow.SlideShowID("Slideshow_AltEnding_PebblesSlug");
     static MenuScene.SceneID altEndingSlideshow_scene1 = new MenuScene.SceneID("Slideshow_AltEnding1_PebblesSlug");
+    public static CustomDeathPersistentSaveData DPSaveData;
 
 
     public static void Apply()
@@ -46,8 +54,7 @@ public class CustomLore
         On.Menu.StoryGameStatisticsScreen.CommunicateWithUpcomingProcess += Menu_StoryGameStatisticsScreen_CommunicateWithUpcomingProcess;
         On.Menu.SlugcatSelectMenu.UpdateStartButtonText += Menu_SlugcatSelectMenu_UpdateStartButtonText;
         On.Menu.SlugcatSelectMenu.ContinueStartedGame += Menu_SlugcatSelectMenu_ContinueStartedGame;
-        // On.Menu.SlugcatSelectMenu.ctor += Menu_SlugcatSelectMenu_ctor;
-        // On.Menu.SlugcatSelectMenu.MineForSaveData += Menu_SlugcatSelectMenu_MineForSaveData;
+
 
 
         On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.Update += MSCRoomSpecificScript_GourmandEnding_Update;
@@ -63,7 +70,82 @@ public class CustomLore
         On.Menu.SlugcatSelectMenu.SlugcatPage.AddAltEndingImage += SlugcatPage_AddAltEndingImage;
         On.Menu.SlideShow.ctor += SlideShow_ctor;
         // On.Menu.MenuScene.BuildScene += MenuScene_BuildScene;
+
+
+        On.SaveState.ctor += SaveState_ctor;
+        On.DeathPersistentSaveData.SaveToString += DeathPersistentSaveData_SaveToString;
+        On.DeathPersistentSaveData.FromString += DeathPersistentSaveData_FromString;
     }
+
+
+
+
+
+    private static void SaveState_ctor(On.SaveState.orig_ctor orig, SaveState self, SlugcatStats.Name saveStateNumber, PlayerProgression progression)
+    {
+        orig(self, saveStateNumber, progression);
+        if (DPSaveData == null)
+        {
+            DPSaveData = new(saveStateNumber);
+        }
+        else
+        {
+            DPSaveData.ClearData(saveStateNumber);
+        }
+    }
+
+
+
+    private static string DeathPersistentSaveData_SaveToString(On.DeathPersistentSaveData.orig_SaveToString orig, DeathPersistentSaveData self, bool saveAsIfPlayerDied, bool saveAsIfPlayerQuit)
+    {
+        string result = orig(self, saveAsIfPlayerDied, saveAsIfPlayerQuit);
+
+        result = DPSaveData.SaveToString(result);
+        Plugin.LogStat("DPSaveData:", result);
+        return result;
+    }
+
+
+
+
+    static private void DeathPersistentSaveData_FromString(On.DeathPersistentSaveData.orig_FromString orig, DeathPersistentSaveData self, string s)
+    {
+        orig(self, s);
+
+        DPSaveData.FromString(self.unrecognizedSaveStrings);
+        List<string> ToRemove = DPSaveData.saveStrings;
+        /*foreach (var x in ToRemove)
+        {
+            Plugin.Log("toremove:", x);
+        }*/
+
+        for (int k = 0; k < self.unrecognizedSaveStrings.Count; k++)
+        {
+            foreach (string str in ToRemove)
+            {
+                if (self.unrecognizedSaveStrings[k].Contains(str))
+                { 
+                    // Plugin.Log("contains", self.unrecognizedSaveStrings[k]);
+                    self.unrecognizedSaveStrings.RemoveAt(k); 
+                    
+                }
+            }
+        }
+        /*foreach (var x in self.unrecognizedSaveStrings)
+        {
+            Plugin.Log("unrecognizedSaveStrings:",x);
+        }*/
+    }
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -253,14 +335,22 @@ public class CustomLore
 
 
     // 防止玩家在循环耗尽的时候正常睡觉
+    // 并且保存数据
     private static void RainWorldGame_Win(On.RainWorldGame.orig_Win orig, RainWorldGame self, bool malnourished)
     {
-        if (self.manager.upcomingProcess != null) return;
+        if (self.manager.upcomingProcess != null || !self.IsStorySession) return;
 
         SaveState save = self.GetStorySession.saveState;
         if (self.GetStorySession.saveStateNumber.value == Plugin.SlugcatName)
         {
             Plugin.LogStat("RainWorldGame_Win: cycle: " + save.cycleNumber);
+            if (CustomLore.DPSaveData != null && CustomLore.DPSaveData.saveStateNumber == Plugin.SlugcatStatsName)
+            {
+                Plugin.Log("CustomLore.DPSaveData.CyclesFromLastEnterSSAI++ :");
+                Plugin.Log(CustomLore.DPSaveData.CyclesFromLastEnterSSAI);
+                CustomLore.DPSaveData.CyclesFromLastEnterSSAI++;
+                Plugin.Log(CustomLore.DPSaveData.CyclesFromLastEnterSSAI);
+            }
             if (!save.deathPersistentSaveData.altEnding && save.cycleNumber >= Plugin.Cycles)
             {
                 Plugin.Log("PebblesSlug Game Over !!! cycle:" + save.cycleNumber);
@@ -314,7 +404,7 @@ public class CustomLore
     // 所有结局都在这，但altending和飞升还有那个beatgamemode
     private static void RainWorldGame_GoToRedsGameOver(On.RainWorldGame.orig_GoToRedsGameOver orig, RainWorldGame self)
     {
-        if (self.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName)
+        if (self.IsStorySession && self.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName)
         {
             Plugin.Log("RainWorldGame_GoToRedsGameOver:");
             Plugin.Log("redsDeath:", self.GetStorySession.saveState.deathPersistentSaveData.redsDeath.ToString());
@@ -374,7 +464,7 @@ public class CustomLore
     private static void RainWorldGame_BeatGameMode(On.RainWorldGame.orig_BeatGameMode orig, RainWorldGame game, bool standardVoidSea)
     {
         orig(game, standardVoidSea);
-        if (game.GetStorySession.saveState.saveStateNumber.value == "PebblesSlug")
+        if (game.IsStorySession && game.GetStorySession.saveState.saveStateNumber.value == "PebblesSlug")
         {
             if (standardVoidSea)
             {
@@ -488,19 +578,18 @@ internal class RoomSpecificScripts
         string name = room.abstractRoom.name;
 
         // 只能触发一次
-        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName 
+        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName 
             && !room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
         {
             Plugin.Log("AddRoomSpecificScript: SS_AI ending");
             room.AddObject(new SS_PebblesAltEnding(room));
         }
-        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName 
+        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName 
             && room.abstractRoom.firstTimeRealized && room.game.GetStorySession.saveState.cycleNumber == 0
             && !room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
         {
             // 这不会导致我返回这个房间的时候再看一次动画罢
             // （修好了）想办法避免玩家在第一个雨循环回来之后再看一次动画。
-            // 我大概有一点想法：把这个函数挪走，static删掉，挪到plugin底下，这样就可以在plugin类里存一个变量用来检查玩家看没看过开场动画。懒得写了，下次修
             Plugin.Log("AddRoomSpecificScript: SS_AI start cutscene");
             room.AddObject(new SS_PebblesStartCutscene(room));
         }
@@ -532,7 +621,7 @@ internal class RoomSpecificScripts
             base.Update(eu);
 
             // 测试的时候用这个粗略判断一下，防止刚一开始就结束了
-            if (room.game.session is not StoryGameSession 
+            if (!room.game.IsStorySession
                 || room.game.GetStorySession.saveStateNumber != Plugin.SlugcatStatsName
                 || !room.game.GetStorySession.saveState.miscWorldSaveData.EverMetMoon ) return;
 
@@ -656,6 +745,8 @@ internal class RoomSpecificScripts
             }
             else if (!player.stillInStartShelter) { return; }
 
+            
+
 
             base.Update(eu);
 
@@ -674,10 +765,32 @@ internal class RoomSpecificScripts
                 {
                     room.roomSettings.effects.Add(new RoomSettings.RoomEffect(RoomSettings.RoomEffect.Type.Contrast, 0f, false));
                 }
+
+                // 找到fp并给他一个初速度，避免玩家一开局看到难绷的画面（
+                Oracle oracle = null;
+                for (int j = 0; j < room.physicalObjects.Length; j++)
+                {
+                    for (int k = 0; k < room.physicalObjects[j].Count; k++)
+                    {
+                        if (room.physicalObjects[j][k] is Oracle)
+                        {
+                            oracle = (room.physicalObjects[j][k] as Oracle);
+                            break;
+                        }
+                    }
+                    if (oracle != null)
+                    {
+                        break;
+                    }
+                }
+                if (oracle != null && oracle.ID == Oracle.OracleID.SS)
+                {
+                    oracle.firstChunk.vel += Vector2.right;
+                }
             }
 
             AbstractCreature firstAlivePlayer = room.game.FirstAlivePlayer;
-            if (room.game.session is StoryGameSession && room.game.Players.Count > 0 && firstAlivePlayer != null && firstAlivePlayer.realizedCreature != null && firstAlivePlayer.realizedCreature.room == room && room.game.GetStorySession.saveState.cycleNumber == 0)
+            if (room.game.IsStorySession && room.game.Players.Count > 0 && firstAlivePlayer != null && firstAlivePlayer.realizedCreature != null && firstAlivePlayer.realizedCreature.room == room && room.game.GetStorySession.saveState.cycleNumber == 0)
             {
                 Player player = firstAlivePlayer.realizedCreature as Player;
 
@@ -745,7 +858,7 @@ internal class RoomSpecificScripts
             if (timer == 640)
             {
                 room.game.cameras[0].hud.textPrompt.AddMessage(room.game.rainWorld.inGameTranslator.Translate(Plugin.strings[0]), 140, 500, true, true);
-                Plugin.Log("total time: ", room.game.GetStorySession.saveState.totTime);
+                // Plugin.Log("total time: ", room.game.GetStorySession.saveState.totTime);
             }
 
             if (timer >= 800)
@@ -753,7 +866,7 @@ internal class RoomSpecificScripts
                 Destroy();
                 return;
             }
-            Plugin.Log("start cutscene timer: ", timer);
+            // Plugin.LogStat("start cutscene timer: ", timer);
             timer++;
         }
 

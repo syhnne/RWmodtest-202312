@@ -112,6 +112,8 @@ public static class ShelterSS_AI
         try
         {
             orig(self);
+            // Plugin.Log("HUD_Foodmeter_GameUpdate:", self.survivalLimit);
+            
         }
         catch (Exception e)
         {

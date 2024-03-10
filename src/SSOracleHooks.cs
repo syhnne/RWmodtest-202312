@@ -138,7 +138,7 @@ public class SSOracleHooks
             if (getModule && module.console != null && module.console.player != null)
             {
                 bool getModulep = Plugin.playerModules.TryGetValue(module.console.player, out var modulep) && modulep.playerName == Plugin.SlugcatStatsName;
-                if (getModulep && modulep.gravityController != null)
+                if (getModulep && modulep.gravityController != null && modulep.gravityController.enabled)
                 {
                     self.oracle.room.gravity = modulep.gravityController.gravityBonus * 0.1f;
                 }

@@ -30,7 +30,7 @@
 
 
 		"karma": 0,
-		"karma_cap": 5,
+		"karma_cap": 4,
 		"the_mark": true,
 		"the_glow": true,
 		"cycle_length_min": 9,
@@ -40,7 +40,7 @@
 		"timeline_after": "Red",
 		"world_state": [ "PebblesSlug", "Red" ],
 		"diet": {
-			"base": "Red",
+			"base": "Gourmand",
 			"meat": 0.25,
 			"corpses": 0.5,
 			"plants": 0.25,

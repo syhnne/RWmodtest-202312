@@ -274,6 +274,7 @@ public class GravityController : UpdatableAndDeletable
                 {
                     player.room.roomSettings.effects[i].amount = amountBrokenZeroG;
                     Plugin.LogStat("room effect set to original value because player died - BrokenZeroG ", player.room.roomSettings.effects[i].amount);
+                    player.room.world.rainCycle.brokenAntiGrav.on = true;
                     break;
                 }
             }

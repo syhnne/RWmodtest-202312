@@ -35,13 +35,16 @@ using HUD;
 using MonoMod.Utils;
 using System.IO;
 using System.Runtime.InteropServices.ComTypes;
+using System.Globalization;
+using System.Text.RegularExpressions;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace PebblesSlug;
 
 
 // 喜欢我全生物-90好感吗
-// 不知道大家玩起来什么体验，反正我是折磨死了，但是我这么菜，这对于别人来说想必不成问题
-// 我希望不要有人来看我这个写的一坨的代码，因为它除了勉强能跑（有的东西也不能跑）以外就没有什么优点了
+// 如果以后要合并四个模组的话，我要顺便重构一下这堆代码，这里面有的东西是我刚学c#的时候写的，拥有长达3个月的悠久历史，写的可谓是达芬奇少了个奇
+// 看这进度飞快的代码和一字没动的剧情，估计是迟早要合并了。还是找个清明节或者五一放假之类的良辰吉日办这件事吧，那将会是长达3天的“明明我只是把它复制过来怎么突然就不好使了”环节
 
 
 
@@ -64,6 +67,7 @@ class Plugin : BaseUnityPlugin
     // 不要给猫改名！！！不要给猫改名！！！不要给猫改名！！！
     // 没事了，我终于懂了。slugbase json里面的id，是下面那个slugcatstatsname.value里面的value，要求完全一致，才能检查的到。
     // 那个name则是显示在游戏界面里的 The xxx 那个名字
+    // TODO: 所以如何去掉这个The呢
 
 
 
@@ -166,6 +170,7 @@ class Plugin : BaseUnityPlugin
             ShelterSS_AI.Apply();
             SSRoomEffects.Apply();
             OverseerHolograms_.Apply();
+            SLOracleHooks.Apply();
 
             On.Player.ClassMechanicsArtificer += Player_ClassMechanicsArtificer;
             On.Player.CraftingResults += Player_CraftingResults;
@@ -177,6 +182,9 @@ class Plugin : BaseUnityPlugin
             On.Player.CanBeSwallowed += Player_CanBeSwallowed;
             On.Player.ThrownSpear += Player_ThrownSpear;
             On.Player.Jump += Player_Jump;
+            // On.Player.AddFood += Player_AddFood;
+            // On.Player.GrabUpdate += Player_GrabUpdate;
+            IL.Player.EatMeatUpdate += Player_EatMeatUpdate;
 
             On.Player.ctor += Player_ctor;
             // On.RainWorldGame.ctor += RainWorldGame_ctor;
@@ -442,14 +450,155 @@ class Plugin : BaseUnityPlugin
 
 
 
+    #region 对话……
+    internal static void LogConversation(Conversation.TextEvent textEvent)
+    {
+        Debug.Log("owner:" + textEvent.owner.ToString() + " initWait:" + textEvent.initialWait.ToString() + " text:" + textEvent.text + " textLinger:" + textEvent.textLinger.ToString());
+    }
+
+    internal static void LogConversation(Conversation owner, int initialWait, string eventName)
+    {
+        Debug.Log("owner:" + owner.ToString() + " initWait:" + initialWait.ToString() + " special event:" + eventName);
+    }
+
+    internal static void LogConversation(Conversation owner, int initialWait, string text, int textLinger)
+    {
+        Debug.Log("owner:"+ owner.ToString() + " initWait:"+initialWait.ToString() + " text:"+text+" textLinger:"+textLinger.ToString());
+    }
 
 
 
+    internal static void LogAllConversations(Conversation convo, int fileName)
+    {
+        LogAllConversations(convo, fileName, false, 0);
+    }
 
 
+    internal static void LogAllConversations(Conversation convo, int fileName, bool oneRandomLine, int randomSeed)
+    {
+        LogAllConversations(convo, fileName, convo.currentSaveFile, oneRandomLine, randomSeed);
+    }
 
 
+    internal static void LogAllConversations(Conversation convo, int fileName, SlugcatStats.Name saveFile, bool oneRandomLine, int randomSeed)
+    {
+        Plugin.Log("======= logging all convos from" + fileName.ToString() + "===========================================");
+        InGameTranslator.LanguageID languageID = convo.interfaceOwner.rainWorld.inGameTranslator.currentLanguage;
+        string text;
+        for (; ; )
+        {
+            text = AssetManager.ResolveFilePath(convo.interfaceOwner.rainWorld.inGameTranslator.SpecificTextFolderDirectory(languageID) + Path.DirectorySeparatorChar.ToString() + fileName.ToString() + ".txt");
+            if (saveFile != null)
+            {
+                string text2 = text;
+                text = AssetManager.ResolveFilePath(string.Concat(new string[]
+                {
+                    convo.interfaceOwner.rainWorld.inGameTranslator.SpecificTextFolderDirectory(languageID),
+                    Path.DirectorySeparatorChar.ToString(),
+                    fileName.ToString(),
+                    "-",
+                    saveFile.value,
+                    ".txt"
+                }));
+                if (!File.Exists(text))
+                {
+                    text = text2;
+                }
+            }
+            if (File.Exists(text))
+            {
+                string text3 = File.ReadAllText(text, Encoding.UTF8);
+                if (text3[0] != '0')
+                {
+                    text3 = Custom.xorEncrypt(text3, 54 + fileName + (int)convo.interfaceOwner.rainWorld.inGameTranslator.currentLanguage * 7);
+                }
+                string[] array = Regex.Split(text3, "\r\n");
+                try
+                {
+                    if (Regex.Split(array[0], "-")[1] == fileName.ToString())
+                    {
+                        if (oneRandomLine)
+                        {
+                            List<Conversation.TextEvent> list = new List<Conversation.TextEvent>();
+                            for (int i = 1; i < array.Length; i++)
+                            {
+                                string[] array2 = LocalizationTranslator.ConsolidateLineInstructions(array[i]);
+                                if (array2.Length == 3)
+                                {
 
+                                    LogConversation(convo, int.Parse(array2[0], NumberStyles.Any, CultureInfo.InvariantCulture), array2[2], int.Parse(array2[1], NumberStyles.Any, CultureInfo.InvariantCulture));
+                                }
+                                else if (array2.Length == 1 && array2[0].Length > 0)
+                                {
+                                    LogConversation(convo, 0, array2[0], 0);
+                                }
+                            }
+                            if (list.Count > 0)
+                            {
+                                Random.State state = Random.state;
+                                Random.InitState(randomSeed);
+                                Conversation.TextEvent item = list[Random.Range(0, list.Count)];
+                                Random.state = state;
+                                LogConversation(item);
+                            }
+                        }
+                        else
+                        {
+                            for (int j = 1; j < array.Length; j++)
+                            {
+                                string[] array3 = LocalizationTranslator.ConsolidateLineInstructions(array[j]);
+                                if (array3.Length == 3)
+                                {
+                                    int num;
+                                    int num2;
+                                    if (ModManager.MSC && !int.TryParse(array3[1], NumberStyles.Any, CultureInfo.InvariantCulture, out num) && int.TryParse(array3[2], NumberStyles.Any, CultureInfo.InvariantCulture, out num2))
+                                    {
+                                        LogConversation(convo, int.Parse(array3[0], NumberStyles.Any, CultureInfo.InvariantCulture), array3[1], int.Parse(array3[2], NumberStyles.Any, CultureInfo.InvariantCulture));
+                                    }
+                                    else
+                                    {
+                                        LogConversation(convo, int.Parse(array3[0], NumberStyles.Any, CultureInfo.InvariantCulture), array3[2], int.Parse(array3[1], NumberStyles.Any, CultureInfo.InvariantCulture));
+                                    }
+                                }
+                                else if (array3.Length == 2)
+                                {
+                                    if (array3[0] == "SPECEVENT")
+                                    {
+                                        LogConversation(convo, 0, array3[1]);
+                                    }
+                                    else if (array3[0] == "PEBBLESWAIT")
+                                    {
+                                        // convo.events.Add(new SSOracleBehavior.PebblesConversation.PauseAndWaitForStillEvent(convo, null, int.Parse(array3[1], NumberStyles.Any, CultureInfo.InvariantCulture)));
+                                        Debug.Log("PEBBLESWAIT");
+                                    }
+                                }
+                                else if (array3.Length == 1 && array3[0].Length > 0)
+                                {
+                                    LogConversation(convo, 0, array3[0], 0);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    Debug.Log("TEXT ERROR");
+                }
+            }
+            Debug.Log("NOT FOUND " + text);
+            if (languageID == InGameTranslator.LanguageID.English)
+            {
+                break;
+            }
+            Debug.Log("RETRY WITH ENGLISH");
+            languageID = InGameTranslator.LanguageID.English;
+        }
+        Plugin.Log("============== log end here ===============================");
+    
+    }
+
+
+    #endregion
 
 
 
@@ -466,10 +615,58 @@ class Plugin : BaseUnityPlugin
     // 从雨循环15开始，每隔5个雨循环涨一点休眠饱食度，再加上逐渐恶化的营养不良效果（
     // 我的建议是前7个雨循环内跑完剧情，亲测挂上了香菇病之后得至少两只秃鹫才能雨眠，而且最高矛伤会掉到1.2
 
+    private void Player_AddFood(On.Player.orig_AddFood orig, Player self, int add)
+    {
+        orig(self, add);
+        if (self.slugcatStats.name == Plugin.SlugcatStatsName)
+        {
+            Plugin.Log("addfood:", add);
+        }
+    }
 
 
+    private void Player_GrabUpdate(On.Player.orig_GrabUpdate orig, Player self, bool eu)
+    {
+        orig(self, eu);
+        if (self.slugcatStats.name == Plugin.SlugcatStatsName)
+        {
+            for (int i = 0; i<2; i++)
+            {
+                if (self.input[0].pckp && self.grasps[i] != null && self.grasps[i].grabbed is Creature && self.CanEatMeat(self.grasps[i].grabbed as Creature) && (self.grasps[i].grabbed as Creature).Template.meatPoints > 0)
+                {
+                    Plugin.Log("meatpoints:", (self.grasps[i].grabbed as Creature).Template.meatPoints);
+                }
+            }
+        }
+    }
 
-   
+
+    // 经测试，这个饱食度设定只在自己存档，或者自己是玩家1的时候生效，所以我需要自己重写一遍
+    // 悲伤的是这个东西不生效
+    private void Player_EatMeatUpdate(ILContext il)
+    {
+        ILCursor c = new(il);
+        // 654 修改判定
+        if (c.TryGotoNext(MoveType.After,
+            i => i.Match(OpCodes.Ldsfld),
+            i => i.Match(OpCodes.Call),
+            i => i.Match(OpCodes.Brtrue_S),
+            i => i.Match(OpCodes.Ldarg_0),
+            i => i.Match(OpCodes.Ldfld),
+            i => i.Match(OpCodes.Ldsfld),
+            i => i.Match(OpCodes.Call)
+            ))
+        {
+            Plugin.Log("match successfully - eatmeatupdate");
+            c.Emit(OpCodes.Ldarg_0);
+            c.EmitDelegate<Func<bool, SlugcatStats.Name, bool>>((isGourmand, name) =>
+            {
+                return isGourmand || (name == Plugin.SlugcatStatsName);
+            });
+        }
+    }
+
+
 
 
 
@@ -566,7 +763,7 @@ class Plugin : BaseUnityPlugin
         }
 
         ILCursor c2 = new ILCursor(il);
-        // 189 修改食物条显示 不要动这个计算逻辑，他和楼下那个实际计算食物条的东西是完全一样的
+        // 189 修改食物条显示
         if (c2.TryGotoNext(MoveType.After,
             (i) => i.Match(OpCodes.Ldfld),
             (i) => i.Match(OpCodes.Ldarg_S),
@@ -643,7 +840,7 @@ class Plugin : BaseUnityPlugin
             c.Emit(OpCodes.Ldloc_0);
             c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
             {
-                return isRed || (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName && !player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding);
+                return isRed || (player.room.game.IsStorySession && player.room.game.GetStorySession.saveState.saveStateNumber == Plugin.SlugcatStatsName && !player.room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding);
             });
         }
 
@@ -662,7 +859,7 @@ class Plugin : BaseUnityPlugin
             c2.Emit(OpCodes.Ldloc_0);
             c2.EmitDelegate<Func<int, Player, int>>((RedsCycles, player) =>
             {
-                if (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+                if (player.room.game.IsStorySession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
                 {
                     return Cycles;
                 }
@@ -693,7 +890,7 @@ class Plugin : BaseUnityPlugin
             c.Emit(OpCodes.Ldloc_0); //Player
             c.EmitDelegate<Func<bool, Player, bool>>((isRed, player) =>
             {
-                return isRed || (player.room.game.session is StoryGameSession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && !player.abstractCreature.world.game.GetStorySession.saveState.deathPersistentSaveData.altEnding);
+                return isRed || (player.room.game.IsStorySession && player.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && !player.abstractCreature.world.game.GetStorySession.saveState.deathPersistentSaveData.altEnding);
             });
         }
         ILCursor c2 = new ILCursor(il);
@@ -774,7 +971,7 @@ class Plugin : BaseUnityPlugin
             Menu.SleepAndDeathScreen owner = (self.hud.owner as Menu.SleepAndDeathScreen);
             if (CycleGetFood(package.saveState.cycleNumber - 1) < CycleGetFood(package.saveState.cycleNumber))
             {
-                Plugin.LogStat("HUD_FoodMeter_SleepUpdate - FOOD CHANGING survival limit: ", self.survivalLimit, " start malnourished: ", owner.startMalnourished);
+                // Plugin.LogStat("HUD_FoodMeter_SleepUpdate - FOOD CHANGING survival limit: ", self.survivalLimit, " start malnourished: ", owner.startMalnourished);
                 owner.startMalnourished = true;
                 // 强制玩家观看动画。反正占不了他们几秒，但我可是做了一下午，都给我看（
                 if (CycleGetFood(package.saveState.cycleNumber) == MinFood + 1)
@@ -901,9 +1098,9 @@ class Plugin : BaseUnityPlugin
         self.redsIllness?.Update();
 
         // 一站式判定，从此告别烦恼。。我恨这个room。。
-        if (self.room == null) return;
-        bool isMyStory = self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName;
-        if (getModule && self.room.game != null && self.room.game.session is StoryGameSession)
+        if (self.room == null || self.dead) return;
+        bool isMyStory = self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName;
+        if (getModule && self.room.game != null && self.room.game.IsStorySession)
         {
             module.gravityController?.Update(eu, isMyStory);
         }
@@ -913,7 +1110,7 @@ class Plugin : BaseUnityPlugin
             ShelterSS_AI.Player_Update(self);
         }
 
-
+        
 
     }
 
@@ -937,7 +1134,7 @@ class Plugin : BaseUnityPlugin
         orig(self, abstractCreature, world);
         
 
-        if (world.game.session is StoryGameSession && self.slugcatStats.name.value == SlugcatName)
+        if (world.game.IsStorySession && self.slugcatStats.name.value == SlugcatName)
         {
             playerModules.Add(self, new PlayerModule(self));
             
@@ -1057,29 +1254,38 @@ class Plugin : BaseUnityPlugin
         bool getModule = playerModules.TryGetValue(self, out var module) && module.playerName == SlugcatStatsName;
         if (getModule && self.slugcatStats.name == SlugcatStatsName)
         {
-            bool isMyStory = newRoom.game.session is StoryGameSession && newRoom.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName;
+            bool isMyStory = newRoom.game.IsStorySession && newRoom.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName;
             module.gravityController?.NewRoom(isMyStory);
-            if (self.room == null || module.console == null) { return; }
-            if (self.room.abstractRoom.name != "SS_AI")
+
+
+            if (newRoom.abstractRoom.name == "SS_AI" && CustomLore.DPSaveData != null && CustomLore.DPSaveData.saveStateNumber == Plugin.SlugcatStatsName)
             {
-                module.console.isActive = false;
+                CustomLore.DPSaveData.CyclesFromLastEnterSSAI = 0;
+                Plugin.LogStat("CustomLore.DPSaveData.CyclesFromLastEnterSSAI CLEEARED");
             }
-            else if(isMyStory && newRoom.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+
+            if (self.room == null) { return; }
+            if (module.console != null)
             {
-                module.console.Enter();
+                if (self.room.abstractRoom.name != "SS_AI")
+                {
+                    module.console.isActive = false;
+                }
+                else if (isMyStory && newRoom.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+                {
+                    module.console.Enter();
+                }
             }
-        }
+            
 
+            // logs
+            if (!DevMode) return;
 
-
-
-        if (!DevMode) return;
-        if (self.room != null)
-        {
-            Plugin.LogStat("ROOM: ", self.room.abstractRoom.name, " SHELTER INDEX: ",self.room.abstractRoom.shelterIndex);
+            Plugin.LogStat("ROOM: ", self.room.abstractRoom.name, " SHELTER INDEX: ", self.room.abstractRoom.shelterIndex);
             if (self.room.abstractRoom.isAncientShelter) { Plugin.LogStat("IS ANCIENT SHELTER"); }
-        }
 
+            Plugin.Log("CustomLore.DPSaveData.CyclesFromLastEnterSSAI:", CustomLore.DPSaveData.CyclesFromLastEnterSSAI, CustomLore.DPSaveData.saveStateNumber.value);
+        }
     }
 
 
@@ -1136,7 +1342,7 @@ class Plugin : BaseUnityPlugin
     private void RegionGate_customKarmaGateRequirements(On.RegionGate.orig_customKarmaGateRequirements orig, RegionGate self)
     {
         orig(self);
-        if (self.room.abstractRoom.name == "GATE_UW_LC" && self.room.game.session is StoryGameSession && self.room.game.GetStorySession.saveStateNumber == SlugcatStatsName)
+        if (self.room.abstractRoom.name == "GATE_UW_LC" && self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == SlugcatStatsName)
         {
             self.karmaRequirements[0] = RegionGate.GateRequirement.OneKarma;
         }
@@ -1659,7 +1865,7 @@ class Plugin : BaseUnityPlugin
                 (abstractPhysicalObject as AbstractSpear).stuckInWallCycles = 0;
             }
             self.objectInStomach = abstractPhysicalObject;
-            if (ModManager.MMF && self.room.game.session is StoryGameSession)
+            if (ModManager.MMF && self.room.game.IsStorySession)
             {
                 (self.room.game.session as StoryGameSession).RemovePersistentTracker(self.objectInStomach);
             }
