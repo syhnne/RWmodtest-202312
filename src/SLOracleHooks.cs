@@ -10,6 +10,13 @@ namespace PebblesSlug;
 internal class SLOracleHooks
 {
 
+    public static void Disable()
+    {
+        // On.SLOracleBehaviorHasMark.InitateConversation -= SLOracleBehaviorHasMark_InitateConversation;
+        On.SLOracleBehaviorHasMark.MoonConversation.AddEvents -= MoonConversation_AddEvents;
+    }
+
+
     public static void Apply()
     {
         // On.SLOracleBehaviorHasMark.InitateConversation += SLOracleBehaviorHasMark_InitateConversation;

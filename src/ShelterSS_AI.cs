@@ -70,7 +70,16 @@ namespace PebblesSlug;
 public static class ShelterSS_AI
 {
 
-
+    public static void Disable()
+    {
+        IL.HUD.FoodMeter.GameUpdate -= IL_HUD_Foodmeter_GameUpdate;
+        On.HUD.FoodMeter.GameUpdate -= HUD_Foodmeter_GameUpdate;
+        IL.HUD.KarmaMeter.Draw -= IL_HUD_KarmaMeter_Draw;
+        new Hook(
+            typeof(KarmaMeter).GetProperty(nameof(KarmaMeter.Radius), BindingFlags.Instance | BindingFlags.Public).GetGetMethod(),
+            KarmaMeter_Radius
+            );
+    }
 
 
     public static void Apply()

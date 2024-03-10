@@ -20,8 +20,8 @@ public class CustomDeathPersistentSaveData
     public bool TestData = false;
     public List<string> saveStrings = new List<string>()
     {
-        "CyclesFromLastEnterSSAI",
-        // "TestData"
+        nameof(CyclesFromLastEnterSSAI),
+
     };
 
 
@@ -40,12 +40,11 @@ public class CustomDeathPersistentSaveData
 
 
 
-    // TODO: 这个字符串会越堆越多，以后改改
-    // 噢 是unrecognized那儿没删掉导致的
+
     public string SaveToString(string res)
     {
         Plugin.LogStat("DPSaveData - SaveToString", CyclesFromLastEnterSSAI);
-        res += TotalHeader + saveStrings[0] + "<dpB>" + CyclesFromLastEnterSSAI.ToString() + "<dpA>";
+        res += TotalHeader + nameof(CyclesFromLastEnterSSAI) + "<dpB>" + CyclesFromLastEnterSSAI.ToString() + "<dpA>";
         // res += TotalHeader + saveStrings[1] + "<dpB>" + TestData.ToString() + "<dpA>";
 
 
@@ -66,16 +65,12 @@ public class CustomDeathPersistentSaveData
             string[] data = Regex.Split(d, "<dpB>");
 
 
-            if (data[0].Contains(saveStrings[0]))
+            if (data[0].Contains(nameof(CyclesFromLastEnterSSAI)))
             {
                 CyclesFromLastEnterSSAI = int.Parse(data[1]);
-                // Plugin.Log("data:", saveStrings[0], CyclesFromLastEnterSSAI);
+                // Plugin.Log("data:", nameof(CyclesFromLastEnterSSAI), CyclesFromLastEnterSSAI);
             }
-            /*if (data[0].Contains(saveStrings[1]))
-            {
-                TestData = bool.Parse(data[1]);
-                Plugin.Log("data:", saveStrings[1], TestData);
-            }*/
+
         }
 
     }

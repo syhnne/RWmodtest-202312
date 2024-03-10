@@ -22,6 +22,7 @@ using UnityEngine.Rendering;
 using System.Text.RegularExpressions;
 using UnityEngine.Diagnostics;
 using System.Runtime.Remoting.Messaging;
+using static PebblesSlug.RoomSpecificScripts;
 
 
 
@@ -44,6 +45,32 @@ public class CustomLore
     static SlideShow.SlideShowID altEndingSlideshow = new SlideShow.SlideShowID("Slideshow_AltEnding_PebblesSlug");
     static MenuScene.SceneID altEndingSlideshow_scene1 = new MenuScene.SceneID("Slideshow_AltEnding1_PebblesSlug");
     public static CustomDeathPersistentSaveData DPSaveData;
+
+
+    public static void Disable()
+    {
+
+        On.RainWorldGame.Win -= RainWorldGame_Win;
+
+        On.Menu.StoryGameStatisticsScreen.CommunicateWithUpcomingProcess -= Menu_StoryGameStatisticsScreen_CommunicateWithUpcomingProcess;
+        On.Menu.SlugcatSelectMenu.UpdateStartButtonText -= Menu_SlugcatSelectMenu_UpdateStartButtonText;
+        On.Menu.SlugcatSelectMenu.ContinueStartedGame -= Menu_SlugcatSelectMenu_ContinueStartedGame;
+
+        On.MoreSlugcats.MSCRoomSpecificScript.OE_GourmandEnding.Update -= MSCRoomSpecificScript_GourmandEnding_Update;
+
+        IL.SaveState.LoadGame -= SaveState_LoadGame;
+        On.RainWorldGame.GoToRedsGameOver -= RainWorldGame_GoToRedsGameOver;
+        On.RainWorldGame.BeatGameMode -= RainWorldGame_BeatGameMode;
+        On.Room.Loaded -= Room_Loaded;
+
+        On.Menu.SlugcatSelectMenu.SlugcatPage.AddAltEndingImage -= SlugcatPage_AddAltEndingImage;
+        On.Menu.SlideShow.ctor -= SlideShow_ctor;
+
+        On.SaveState.ctor -= SaveState_ctor;
+        On.DeathPersistentSaveData.SaveToString -= DeathPersistentSaveData_SaveToString;
+        On.DeathPersistentSaveData.FromString -= DeathPersistentSaveData_FromString;
+    }
+
 
 
     public static void Apply()
@@ -527,6 +554,7 @@ public class CustomLore
 
 
 
+    #endregion
 
 
 
@@ -539,19 +567,21 @@ public class CustomLore
     {
         if (self.abstractRoom.name == "SS_AI" && self.game.IsStorySession && self.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
         {
-            Plugin.Log("Room_Loaded: SS_AI room specific script added !");
-            self.roomSettings.roomSpecificScript = true;
+            if (self.abstractRoom.firstTimeRealized && self.game.GetStorySession.saveState.cycleNumber == 0
+                && !self.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+            {
+                Plugin.Log("AddRoomSpecificScript: SS_AI start cutscene");
+                self.AddObject(new SS_PebblesStartCutscene(self));
+            }
+            if (!self.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
+            {
+                Plugin.Log("AddRoomSpecificScript: SS_AI ending");
+                self.AddObject(new SS_PebblesAltEnding(self));
+            }
         }
         orig(self);
-        // 在这里加入roomspecificscript。救命。没人讲过开发者工具怎么用，结果我就把那个SS_AI房间的什么着色效果给搞坏了，现在每次进去都会被橙色闪瞎狗眼。。
-        // 好了，修好了。开发者工具是在world文件夹对应的房间里面创建了一个新的文件，把那个删了就恢复正常了。。
-        
+
     }
-
-
-
-
-    #endregion
 
 
 
@@ -567,38 +597,6 @@ public class CustomLore
 
 internal class RoomSpecificScripts
 {
-
-    internal static void Apply()
-    {
-        On.MoreSlugcats.MSCRoomSpecificScript.AddRoomSpecificScript += MSCRoomSpecificScript_AddRoomSpecificScript;
-    }
-
-    private static void MSCRoomSpecificScript_AddRoomSpecificScript(On.MoreSlugcats.MSCRoomSpecificScript.orig_AddRoomSpecificScript orig, Room room)
-    {
-        string name = room.abstractRoom.name;
-
-        // 只能触发一次
-        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName 
-            && !room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
-        {
-            Plugin.Log("AddRoomSpecificScript: SS_AI ending");
-            room.AddObject(new SS_PebblesAltEnding(room));
-        }
-        if (name == "SS_AI" && room.game.IsStorySession && room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName 
-            && room.abstractRoom.firstTimeRealized && room.game.GetStorySession.saveState.cycleNumber == 0
-            && !room.game.GetStorySession.saveState.deathPersistentSaveData.altEnding)
-        {
-            // 这不会导致我返回这个房间的时候再看一次动画罢
-            // （修好了）想办法避免玩家在第一个雨循环回来之后再看一次动画。
-            Plugin.Log("AddRoomSpecificScript: SS_AI start cutscene");
-            room.AddObject(new SS_PebblesStartCutscene(room));
-        }
-
-        // 典中典之忘写orig
-        orig(room);
-    }
-
-
 
     // public class OE_GourmandEnding : UpdatableAndDeletable 改的这个
     // 这应该是正经结局，好了，那么问题来了，fp猫猫是怎么把自己整活的。回头我得想想，现在的内容是只要进了这个房间且掉在地板上（y<400f？）过几秒就触发结局
@@ -958,7 +956,6 @@ public class TestSprite : CosmeticSprite
 
     public override void DrawSprites(RoomCamera.SpriteLeaser sLeaser, RoomCamera rCam, float timeStacker, Vector2 camPos)
     {
-        int textSpeed = 10;
         if (timer > 160 && timer % 8 < 4)
         {
             visible = false;

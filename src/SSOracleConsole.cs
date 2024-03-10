@@ -31,7 +31,6 @@ public class SSOracleConsole : UpdatableAndDeletable
     public bool lastIsActive = false;
     public SSOracleBehavior behavior;
     public Vector2 destination;
-    private static int moveSpeed = 2;
     public SSOracleConsoleHUD hud;
 
     public SSOracleConsole(Oracle oracle) 

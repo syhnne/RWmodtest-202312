@@ -1,0 +1,6 @@
+Template: SL_SettingsTemplate_Sewer
+DangerType: Flood
+Clouds: 0.7391304
+EffectColorB: 6
+PlacedObjects: BubbleGrass><644.7745><220.132><0~0~1~5, BubbleGrass><613.9407><217.7053><0~0~2~5, 
+FadePalette: 8, 0.1630435

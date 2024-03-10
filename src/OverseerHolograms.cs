@@ -45,8 +45,15 @@ namespace PebblesSlug;
 /// <summary>
 /// 原来是这么解决的吗？太离谱了
 /// </summary>
-internal class OverseerHolograms_
+internal class CustomOverseerHolograms
 {
+
+    public static void Disable()
+    {
+        On.OverseerCommunicationModule.ReevaluateConcern -= OverseerCommunicationModule_ReevaluateConcern;
+        On.OverseerHolograms.OverseerImage.HoloImage.DrawSprites -= HoloImage_DrawSprites;
+        On.AbstractRoom.RealizeRoom -= AbstractRoom_RealizeRoom;
+    }
 
 
     public static void Apply()

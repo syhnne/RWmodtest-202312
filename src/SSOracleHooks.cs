@@ -47,6 +47,25 @@ namespace PebblesSlug;
 public class SSOracleHooks
 {
 
+    public static void Disable()
+    {
+        // IL.SSOracleBehavior.Update += IL_SSOracleBehavior_Update;
+        On.SSOracleBehavior.ctor -= SSOracleBehavior_ctor;
+        On.Oracle.ctor -= Oracle_ctor;
+        On.SSOracleBehavior.SeePlayer -= SSOracleBehavior_SeePlayer;
+        On.SSOracleBehavior.Update -= SSOracleBehavior_Update;
+        On.Oracle.Destroy -= Oracle_Destroy;
+        On.SSOracleBehavior.NewAction -= SSOracleBehavior_NewAction;
+        // On.OracleBehavior.UnconciousUpdate -= OracleBehavior_UnconciousUpdate;
+        On.SSOracleBehavior.UnconciousUpdate -= SSOracleBehavior_UnconciousUpdate;
+        On.SSOracleBehavior.storedPearlOrbitLocation -= SSOracleBehavior_storedPearlOrbitLocation;
+        On.PebblesPearl.Update -= PebblesPearl_Update;
+
+        // IL.Oracle.ctor -= IL_Oracle_ctor;
+        // On.OracleGraphics.ctor -= OracleGraphics_ctor;
+    }
+
+
 
     public static void Apply()
     {

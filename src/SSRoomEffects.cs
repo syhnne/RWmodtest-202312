@@ -19,9 +19,28 @@ namespace PebblesSlug;
 /// 
 /// 下一作说不定还要用这些代码（
 internal class SSRoomEffects
-
-
 {
+
+    public static void Disable()
+    {
+        On.GravityDisruptor.Update -= GravityDisruptor_Update;
+        On.CoralBrain.SSMusicTrigger.Trigger -= CoralBrain_SSMusicTrigger_Trigger;
+        // On.CoralBrain.CoralNeuronSystem.Update -= CoralBrain_CoralNeuronSystem_Update;
+        On.ZapCoil.Update -= ZapCoil_Update;
+        On.ZapCoilLight.Update -= ZapCoilLight_Update;
+        // On.RoomSettings.LoadEffects -= RoomSettings_LoadEffects;
+        // On.RoomRealizer.RealizeAndTrackRoom -= RoomRealizer_RealizeAndTrackRoom;
+        On.AbstractRoom.RealizeRoom -= AbstractRoom_RealizeRoom;
+        On.SSLightRod.Update -= SSLightRod_Update;
+        On.Room.Loaded -= Room_Loaded;
+        // On.SSLightRod.InitiateSprites -= SSLightRod_InitiateSprites;
+
+    }
+
+
+
+
+
     public static void Apply()
     {
         On.GravityDisruptor.Update += GravityDisruptor_Update;
