@@ -56,7 +56,7 @@ namespace PebblesSlug;
 
 
 
-
+// TODO: 改写这坨东西，照着srs的代码写。我猜这能解决新装的模组引发的贴图问题，到时候再说
 internal class CustomPlayerGraphics
 {
 
@@ -148,11 +148,15 @@ internal class CustomPlayerGraphics
                 }
                 else
                 {
-                    if (Futile.atlasManager.DoesContainElementWithName("fp_" + sLeaser.sprites[i].element.name))
+                    if (sLeaser.sprites[i].element.name.StartsWith(sLeaser.sprites[i].element.name))
                     {
-                        Plugin.Log("element:          ", sLeaser.sprites[i].element.name);
-                        sLeaser.sprites[i].element = Futile.atlasManager.GetElementWithName(sLeaser.sprites[i].element.name.Replace(sLeaser.sprites[i].element.name, "fp_" + sLeaser.sprites[i].element.name));
+                        if (Futile.atlasManager.DoesContainElementWithName("fp_" + sLeaser.sprites[i].element.name))
+                        {
+                            // Plugin.Log("element:          ", sLeaser.sprites[i].element.name);
+                            sLeaser.sprites[i].element = Futile.atlasManager.GetElementWithName(sLeaser.sprites[i].element.name.Replace(sLeaser.sprites[i].element.name, "fp_" + sLeaser.sprites[i].element.name));
+                        }
                     }
+                    
                 }
 
 

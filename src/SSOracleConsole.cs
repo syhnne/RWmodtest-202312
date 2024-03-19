@@ -14,9 +14,8 @@ using MoreSlugcats;
 
 namespace PebblesSlug;
 
-/// <summary>
-/// 打完结局后解锁的控制台，可以让你使用一些迭代器特有的奇妙能力（？
-/// </summary>
+// TODO: 给恢复业力饱食度加个特效，可以整一个像开光那样的
+
 
 
 // 我要是真把这玩意儿做出来了，我就要请自己吃一顿大餐

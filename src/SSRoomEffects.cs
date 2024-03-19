@@ -81,7 +81,7 @@ internal class SSRoomEffects
 
     private static void Room_Loaded(On.Room.orig_Loaded orig, Room self)
     {
-        if (self.game != null && self.game.IsStorySession && self.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && !self.game.GetStorySession.saveState.deathPersistentSaveData.altEnding
+        if (self.game != null && self.game.IsStorySession && self.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && !self.game.GetStorySession.saveState.deathPersistentSaveData.altEnding && self.abstractRoom.name.StartsWith("SS")
             && self.roomSettings != null && self.roomSettings.placedObjects.Count > 0)
         {
 
@@ -103,7 +103,7 @@ internal class SSRoomEffects
     private static void ZapCoilLight_Update(On.ZapCoilLight.orig_Update orig, ZapCoilLight self, bool eu)
     {
         orig(self, eu);
-        if (self.room != null && self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        if (self.room != null && self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.room.abstractRoom.name.StartsWith("SS"))
         {
             self.lightSource.alpha = 0f;
         }
@@ -119,7 +119,7 @@ internal class SSRoomEffects
     {
         orig(self, world, game);
         if (self.realizedRoom == null) { return; }
-        if (game.IsStorySession && game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        if (game.IsStorySession && game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.name.StartsWith("SS"))
         {
             RoomSettings settings = self.realizedRoom.roomSettings;
 
@@ -155,7 +155,7 @@ internal class SSRoomEffects
     private static void SSLightRod_Update(On.SSLightRod.orig_Update orig, SSLightRod self, bool eu)
     {
         orig(self, eu);
-        if (self.room != null && self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        if (self.room != null && self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.room.abstractRoom.name.StartsWith("SS"))
         {
             self.lights = new List<SSLightRod.LightVessel>();
             self.color = new Color(0.1f, 0.1f, 0.1f);
@@ -234,7 +234,7 @@ internal class SSRoomEffects
     {
         try
         {
-            if (self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+            if (self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.room.abstractRoom.name.StartsWith("SS"))
             {
                 self.powered = false;
             }
@@ -253,7 +253,7 @@ internal class SSRoomEffects
     private static void GravityDisruptor_Update(On.GravityDisruptor.orig_Update orig, GravityDisruptor self, bool eu)
     {
         orig(self, eu);
-        if (self.room != null && self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        if (self.room != null && self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.room.abstractRoom.name.StartsWith("SS"))
         {
             self.power = 0f;
 
@@ -268,7 +268,7 @@ internal class SSRoomEffects
     // 啊啊啊啊啊啊啊啊啊别放音乐了
     private static void CoralBrain_SSMusicTrigger_Trigger(On.CoralBrain.SSMusicTrigger.orig_Trigger orig, CoralBrain.SSMusicTrigger self)
     {
-        if (self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName)
+        if (self.room.game.IsStorySession && self.room.game.GetStorySession.saveStateNumber == Plugin.SlugcatStatsName && self.room.abstractRoom.name.StartsWith("SS"))
         {
             return;
         }

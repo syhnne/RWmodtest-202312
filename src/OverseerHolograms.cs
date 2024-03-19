@@ -84,7 +84,7 @@ internal class CustomOverseerHolograms
 
 
 
-    // TODO: 这地方有bug，虽然不影响运行但还是修一下
+
     private static void AbstractRoom_RealizeRoom(On.AbstractRoom.orig_RealizeRoom orig, AbstractRoom self, World world, RainWorldGame game)
     {
         orig(self, world, game);
@@ -147,7 +147,7 @@ internal class CustomOverseerHolograms
 
 
 
-    // TODO: 写个函数在房间里放一个projected image position
+
 
     private static void HoloImage_Update(On.OverseerHolograms.OverseerImage.HoloImage.orig_Update orig, OverseerImage.HoloImage self)
     {

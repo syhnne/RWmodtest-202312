@@ -154,6 +154,28 @@ class Plugin : BaseUnityPlugin
             IL.Centipede.Shock += IL_Centipede_Shock;
 
             RedsIllnessModules.Apply();
+
+            if (!Futile.atlasManager.DoesContainElementWithName("fp_tail"))
+            {
+                Futile.atlasManager.LoadAtlas("atlases/fp_tail");
+            }
+            if (!Futile.atlasManager.DoesContainElementWithName("fp_HeadA0"))
+            {
+                Futile.atlasManager.LoadAtlas("atlases/fp_head");
+            }
+            if (!Futile.atlasManager.DoesContainElementWithName("fp_PlayerArm0"))
+            {
+                Futile.atlasManager.LoadAtlas("atlases/fp_arm");
+            }
+            if (!Futile.atlasManager.DoesContainElementWithName("overseerHolograms/PebblesSlugHologram"))
+            {
+                Futile.atlasManager.LoadImage("overseerHolograms/PebblesSlugHologram");
+            }
+
+
+            
+
+
             Plugin.Log("INIT");
         }
         catch (Exception ex)
@@ -205,20 +227,7 @@ class Plugin : BaseUnityPlugin
 
     private void LoadResources(RainWorld rainWorld)
     {
-        try
-        {
-            Futile.atlasManager.LoadAtlas("atlases/fp_head");
-            Futile.atlasManager.LoadAtlas("atlases/fp_tail");
-            Futile.atlasManager.LoadAtlas("atlases/fp_arm");
 
-            Futile.atlasManager.LoadImage("overseerHolograms/PebblesSlugHologram");
-            // Futile.atlasManager.LogAllElementNames();
-        }
-        catch (Exception ex)
-        {
-            base.Logger.LogError(ex);
-            throw;
-        }
     }
 
 
@@ -598,12 +607,6 @@ class Plugin : BaseUnityPlugin
 
             if (!altEnding) 
             {
-                // 以防挨饿之后他覆盖挨饿的饱食度
-                // 我有一个猜想，redsillness会给玩家挂上malnourished属性，这导致在后来的某个函数里，foodToHibernate又变成了最大食物数
-                // 然而游戏里又藏了一些别的代码，使得我达到foodToBeOkay之后这个值又恢复正常了。。
-                // 总之，我不管了，玩家可能会自己发现这个让他们高兴的事实：即便你前一天晚上挨饿睡觉，第二天也不用吃8个食物就能恢复正常
-                // TODO: 但是能修还是修一下
-
                 // 他妈的，放着不修的下场就是他不知道什么时候变成了foodToHibernate永远都是8，测试的时候差点没给我折磨死
                 // 见鬼的slugcatstats为什么在我playerctor前后都要调用，还要调用好几次
                 // 今天跟你爆了
